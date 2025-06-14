@@ -124,7 +124,6 @@ Desktop.ini
 # Data directory (contains downloaded papers and generated content)
 DATA_DIR/
 *.pdf
-*.md
 
 # API keys and secrets
 .env*
