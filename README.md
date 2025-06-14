@@ -56,7 +56,7 @@ export WORK_DIR="/path/to/your/data/directory"
 ```json
 {
   "mcpServers": {
-    "arxiv-reader": {
+    "arxiv-mcp-server": {
       "command": "npx",
       "args": ["-y", "@langgpt/arxiv-mcp-server@latest"],
       "env": {
