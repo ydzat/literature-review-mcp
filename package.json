@@ -1,0 +1,65 @@
+{
+    "name": "@langgpt/arxiv-mcp-server",
+    "version": "1.1.5",
+    "description": "一个基于arxiv的论文解读器，将arxiv的论文转为通俗易懂的文章和语音",
+    "main": "build/index.js",
+    "bin": {
+        "arxiv-mcp-server": "build/index.js"
+    },
+    "type": "module",
+    "scripts": {
+        "build": "tsc && chmod +x build/index.js",
+        "start": "node build/index.js",
+        "dev": "tsx src/index.ts",
+        "prepublishOnly": "npm run build"
+    },
+    "files": [
+        "build/**/*",
+        "README.md"
+    ],
+    "keywords": [
+        "mcp",
+        "arxiv",
+        "paper",
+        "ai",
+        "translation",
+        "chinese",
+        "tts",
+        "academic",
+        "research"
+    ],
+    "author": {
+        "name": "yzfly",
+        "email": "yz.liu.me@gmail.com",
+        "url": "https://github.com/yzfly"
+    },
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/yzfly/arxiv-mcp-server.git"
+    },
+    "bugs": {
+        "url": "https://github.com/yzfly/arxiv-mcp-server/issues"
+    },
+    "homepage": "https://github.com/yzfly/arxiv-mcp-server#readme",
+    "dependencies": {
+        "@agentic/arxiv": "^7.6.7",
+        "@modelcontextprotocol/sdk": "^0.6.0",
+        "axios": "^1.6.0",
+        "pdf-parse": "^1.1.1",
+        "pdfreader": "^3.0.7"
+    },
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@types/pdf-parse": "^1.1.5",
+        "tsx": "^4.0.0",
+        "typescript": "^5.0.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "publishConfig": {
+        "access": "public",
+        "registry": "https://registry.npmjs.org/"
+    }
+}
