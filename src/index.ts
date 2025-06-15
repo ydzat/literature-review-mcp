@@ -65,7 +65,7 @@ const arxivClient = new ArXivClient({});
 const server = new Server(
   {
     name: "arxiv-mcp-server",
-    version: "1.1.5",
+    version: "1.1.6",
   },
   {
     capabilities: {
@@ -351,7 +351,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {
             query: {
               type: "string",
-              description: "搜索关键词"
+              description: "搜索英文关键词"
             },
             maxResults: {
               type: "number",

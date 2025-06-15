@@ -1,6 +1,6 @@
 {
     "name": "@langgpt/arxiv-mcp-server",
-    "version": "1.1.5",
+    "version": "1.1.6",
     "description": "一个基于arxiv的论文解读器，将arxiv的论文转为通俗易懂的文章和语音",
     "main": "build/index.js",
     "bin": {
