@@ -38,7 +38,7 @@ arxiv-mcp-server
 # 必需：SiliconFlow API Key
 export SILICONFLOW_API_KEY="your_api_key_here"
 
-# 可选：工作目录（默认为当前目录下的 DATA_DIR）
+# 必需：工作目录
 export WORK_DIR="/path/to/your/data/directory"
 ```
 
