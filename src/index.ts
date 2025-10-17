@@ -672,6 +672,133 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ["query"]
         }
+      },
+      // 新增：批量下载 PDF
+      {
+        name: "batch_download_pdfs",
+        description: "批量并发下载多篇论文的 PDF 文件",
+        inputSchema: {
+          type: "object",
+          properties: {
+            paperIds: {
+              type: "array",
+              items: { type: "number" },
+              description: "论文数据库 ID 列表"
+            },
+            maxConcurrent: {
+              type: "number",
+              description: "最大并发数",
+              default: 5
+            },
+            maxRetries: {
+              type: "number",
+              description: "最大重试次数",
+              default: 3
+            }
+          },
+          required: ["paperIds"]
+        }
+      },
+      // 新增：批量分析论文
+      {
+        name: "batch_analyze_papers",
+        description: "批量并发分析多篇论文，生成单篇深度分析并保存到数据库",
+        inputSchema: {
+          type: "object",
+          properties: {
+            arxivIds: {
+              type: "array",
+              items: { type: "string" },
+              description: "arXiv ID 列表"
+            },
+            maxConcurrent: {
+              type: "number",
+              description: "最大并发数",
+              default: 3
+            },
+            temperature: {
+              type: "number",
+              description: "AI 温度参数（0-1）",
+              default: 0.3
+            },
+            skipExisting: {
+              type: "boolean",
+              description: "跳过已有分析的论文",
+              default: true
+            }
+          },
+          required: ["arxivIds"]
+        }
+      },
+      // 新增：生成统一文献综述
+      {
+        name: "generate_unified_literature_review",
+        description: "基于多篇论文的单篇分析，生成跨论文的综合文献综述",
+        inputSchema: {
+          type: "object",
+          properties: {
+            paperIds: {
+              type: "array",
+              items: { type: "number" },
+              description: "论文数据库 ID 列表"
+            },
+            temperature: {
+              type: "number",
+              description: "AI 温度参数（0-1）",
+              default: 0.4
+            },
+            focusArea: {
+              type: "string",
+              description: "研究焦点领域"
+            }
+          },
+          required: ["paperIds"]
+        }
+      },
+      // 新增：导出到 Notion (Full 模式)
+      {
+        name: "export_to_notion_full",
+        description: "导出完整的 Notion 元数据（论文库 + 单篇综述 + 综合综述）",
+        inputSchema: {
+          type: "object",
+          properties: {
+            paperIds: {
+              type: "array",
+              items: { type: "number" },
+              description: "论文数据库 ID 列表"
+            },
+            reviewId: {
+              type: "number",
+              description: "综述 ID（可选）"
+            }
+          },
+          required: ["paperIds"]
+        }
+      },
+      // 新增：导出到 Notion (Update 模式)
+      {
+        name: "export_to_notion_update",
+        description: "只导出增量内容的 Notion 元数据（需要提供已存在的论文列表）",
+        inputSchema: {
+          type: "object",
+          properties: {
+            paperIds: {
+              type: "array",
+              items: { type: "number" },
+              description: "论文数据库 ID 列表"
+            },
+            existingArxivIds: {
+              type: "array",
+              items: { type: "string" },
+              description: "Notion 中已存在的 arXiv ID 列表"
+            },
+            reviewId: {
+              type: "number",
+              description: "综述 ID（可选）"
+            }
+          },
+          required: ["paperIds", "existingArxivIds"]
+        }
       }
     ]
   };
@@ -903,6 +1030,166 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             text: JSON.stringify(result, null, 2)
           }]
         };
+      }
+
+      // 新增：批量下载 PDF
+      case "batch_download_pdfs": {
+        const { batchDownloadFromDatabase } = await import('./batch/download.js');
+        const { paperIds, maxConcurrent, maxRetries } = args as {
+          paperIds: number[];
+          maxConcurrent?: number;
+          maxRetries?: number;
+        };
+
+        const results = await batchDownloadFromDatabase(paperIds, {
+          maxConcurrent,
+          maxRetries
+        });
+
+        const summary = {
+          total: results.length,
+          success: results.filter(r => r.success).length,
+          failed: results.filter(r => !r.success).length,
+          results: results
+        };
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(summary, null, 2)
+          }]
+        };
+      }
+
+      // 新增：批量分析论文
+      case "batch_analyze_papers": {
+        const { batchAnalyzePapers } = await import('./batch/analyze.js');
+        const { arxivIds, maxConcurrent, temperature, skipExisting } = args as {
+          arxivIds: string[];
+          maxConcurrent?: number;
+          temperature?: number;
+          skipExisting?: boolean;
+        };
+
+        const results = await batchAnalyzePapers(arxivIds, {
+          maxConcurrent,
+          temperature,
+          skipExisting
+        });
+
+        const summary = {
+          total: results.length,
+          success: results.filter(r => r.success).length,
+          failed: results.filter(r => !r.success).length,
+          results: results.map(r => ({
+            arxivId: r.arxivId,
+            success: r.success,
+            error: r.error,
+            reviewLength: r.reviewContent?.length
+          }))
+        };
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(summary, null, 2)
+          }]
+        };
+      }
+
+      // 新增：生成统一文献综述
+      case "generate_unified_literature_review": {
+        const { generateUnifiedLiteratureReview } = await import('./batch/unified-review.js');
+        const { paperIds, temperature, focusArea } = args as {
+          paperIds: number[];
+          temperature?: number;
+          focusArea?: string;
+        };
+
+        const result = await generateUnifiedLiteratureReview(paperIds, {
+          temperature,
+          focusArea
+        });
+
+        if (result.success) {
+          return {
+            content: [{
+              type: "text",
+              text: `✅ 统一文献综述已生成\n\n综述 ID: ${result.reviewId}\n字数: ${result.reviewContent?.length}\n\n${result.reviewContent}`
+            }]
+          };
+        } else {
+          return {
+            content: [{
+              type: "text",
+              text: `❌ 综述生成失败: ${result.error}`
+            }],
+            isError: true
+          };
+        }
+      }
+
+      // 新增：导出到 Notion (Full 模式)
+      case "export_to_notion_full": {
+        const { exportToNotionFull } = await import('./notion/export.js');
+        const { paperIds, reviewId } = args as {
+          paperIds: number[];
+          reviewId?: number;
+        };
+
+        const result = await exportToNotionFull(paperIds, reviewId);
+
+        if (result.success) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                summary: result.summary,
+                notion_metadata: result.notion_metadata
+              }, null, 2)
+            }]
+          };
+        } else {
+          return {
+            content: [{
+              type: "text",
+              text: `❌ 导出失败: ${result.error}`
+            }],
+            isError: true
+          };
+        }
+      }
+
+      // 新增：导出到 Notion (Update 模式)
+      case "export_to_notion_update": {
+        const { exportToNotionUpdate } = await import('./notion/export.js');
+        const { paperIds, existingArxivIds, reviewId } = args as {
+          paperIds: number[];
+          existingArxivIds: string[];
+          reviewId?: number;
+        };
+
+        const result = await exportToNotionUpdate(paperIds, existingArxivIds, reviewId);
+
+        if (result.success) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                summary: result.summary,
+                notion_metadata: result.notion_metadata
+              }, null, 2)
+            }]
+          };
+        } else {
+          return {
+            content: [{
+              type: "text",
+              text: `❌ 导出失败: ${result.error}`
+            }],
+            isError: true
+          };
+        }
       }
 
       default:

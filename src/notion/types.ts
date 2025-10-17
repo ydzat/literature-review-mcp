@@ -96,18 +96,27 @@ export interface NotionPageProperties {
  * Notion 元数据（完整输出）
  */
 export interface NotionMetadata {
-  // 数据库相关
+  // 数据库 Schema（用于创建数据库）
+  database_schemas?: NotionDatabaseSchema[];
+
+  // 数据库条目（用于插入数据）
+  database_entries: NotionDatabaseEntry[];
+
+  // 内容块（用于创建页面内容）
+  content_blocks: NotionBlock[];
+
+  // 完整页面（包含标题和内容）
+  pages?: {
+    title: string;
+    blocks: NotionBlock[];
+  }[];
+
+  // 数据库相关（旧格式，保持兼容）
   databases?: {
     schema: NotionDatabaseSchema;
     entries: NotionDatabaseEntry[];
   }[];
-  
-  // 页面相关
-  pages?: {
-    properties: NotionPageProperties;
-    blocks: NotionBlock[];
-  }[];
-  
+
   // 关系说明
   relationships?: {
     from: string; // 源数据库/页面
@@ -115,7 +124,7 @@ export interface NotionMetadata {
     type: 'one-to-many' | 'many-to-many';
     description: string;
   }[];
-  
+
   // 使用说明
   instructions?: string;
 }

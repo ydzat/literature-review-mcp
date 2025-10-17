@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS papers (
   markdown_path TEXT,  -- 生成的中文 Markdown 路径
   wechat_path TEXT,    -- 生成的微信文章路径
   review_path TEXT,    -- 生成的学术综述路径
+  individual_review TEXT,  -- 单篇论文的深度分析内容（用于文献综述）
   source TEXT,  -- arxiv, dblp, openreview, paperswithcode, ieee, acm
   
   -- 质量评分

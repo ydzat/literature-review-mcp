@@ -26,6 +26,7 @@ export interface Paper {
   markdown_path?: string;
   wechat_path?: string;
   review_path?: string;
+  individual_review?: string;  // 单篇论文深度分析内容
   source?: string;
   quality_score?: number;
   author_reputation_score?: number;
@@ -114,10 +115,10 @@ export class DatabaseManager {
         arxiv_id, title, abstract, year, publication_date,
         venue, venue_rank, citation_count, impact_factor,
         peer_review_status, pdf_url, pdf_path, text_path,
-        markdown_path, wechat_path, review_path,
+        markdown_path, wechat_path, review_path, individual_review,
         source, quality_score, author_reputation_score,
         affiliation_tier_score, recency_bonus
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const result = stmt.run(
@@ -137,6 +138,7 @@ export class DatabaseManager {
       paper.markdown_path || null,
       paper.wechat_path || null,
       paper.review_path || null,
+      paper.individual_review || null,
       paper.source || 'arxiv',
       paper.quality_score || null,
       paper.author_reputation_score || null,
@@ -150,6 +152,16 @@ export class DatabaseManager {
   getPaperByArxivId(arxivId: string): Paper | null {
     const stmt = this.db.prepare('SELECT * FROM papers WHERE arxiv_id = ?');
     return stmt.get(arxivId) as Paper | null;
+  }
+
+  getPaperById(id: number): Paper | null {
+    const stmt = this.db.prepare('SELECT * FROM papers WHERE id = ?');
+    return stmt.get(id) as Paper | null;
+  }
+
+  getAllPapers(): Paper[] {
+    const stmt = this.db.prepare('SELECT * FROM papers');
+    return stmt.all() as Paper[];
   }
 
   updatePaper(arxivId: string, updates: Partial<Paper>): void {

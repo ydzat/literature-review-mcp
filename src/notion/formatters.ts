@@ -185,10 +185,14 @@ export function formatSearchResultsForNotion(
   qualityScores?: Map<string, QualityScore>
 ): NotionMetadata {
   return {
+    database_entries: papers.map(paper =>
+      paperToNotionEntry(paper, qualityScores?.get(paper.id))
+    ),
+    content_blocks: [],
     databases: [
       {
         schema: PAPER_DATABASE_SCHEMA,
-        entries: papers.map(paper => 
+        entries: papers.map(paper =>
           paperToNotionEntry(paper, qualityScores?.get(paper.id))
         )
       }
@@ -222,9 +226,14 @@ export function formatLiteratureReviewForNotion(
   papers: PaperMetadata[]
 ): NotionMetadata {
   const reviewPage = createLiteratureReviewPage(title, content, papers);
-  
+
   return {
-    pages: [reviewPage],
+    database_entries: [],
+    content_blocks: reviewPage.blocks,
+    pages: [{
+      title: reviewPage.properties.title,
+      blocks: reviewPage.blocks
+    }],
     databases: [
       {
         schema: PAPER_DATABASE_SCHEMA,

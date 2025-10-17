@@ -124,6 +124,10 @@ export class StorageManager {
 
   saveText(arxivId: string, text: string): string {
     const textPath = this.getTextPath(arxivId);
+    const textDir = path.dirname(textPath);
+    if (!fs.existsSync(textDir)) {
+      fs.mkdirSync(textDir, { recursive: true });
+    }
     fs.writeFileSync(textPath, text, 'utf-8');
     console.log(`✅ 文本已保存: ${textPath}`);
     return textPath;
