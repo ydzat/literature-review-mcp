@@ -22,53 +22,80 @@ export class OpenReviewDataSource extends AcademicDataSource {
       }
 
       const limit = filters.maxResults || 30;
-      
-      console.log(`🔍 搜索 OpenReview: ${filters.query}`);
-      
-      // OpenReview API v2 搜索
-      const response = await axios.get(`${this.baseUrl}/notes`, {
-        params: {
-          content: filters.query,
-          limit,
-          details: 'replyCount,invitation'
-        },
-        timeout: 15000,
-        headers: {
-          'User-Agent': 'ArXiv-MCP-Server/1.0'
-        }
-      });
 
-      const notes = response.data.notes || [];
-      
-      const papers: PaperMetadata[] = notes.map((note: any) => {
-        const content = note.content || {};
-        return {
-          id: note.id,
-          title: content.title?.value || content.title || '',
-          abstract: content.abstract?.value || content.abstract || '',
-          authors: content.authors?.value || content.authors || [],
-          year: note.cdate ? new Date(note.cdate).getFullYear() : undefined,
-          venue: note.invitation?.split('/-/')[0] || 'OpenReview',
-          venueRank: this.getVenueRank(note.invitation),
-          pdfUrl: content.pdf?.value || undefined,
-          sourceUrl: `https://openreview.net/forum?id=${note.id}`,
-          source: 'openreview',
-          peerReviewStatus: 'preprint'
-        };
-      });
+      console.log(`🔍 搜索 OpenReview: ${filters.query}`);
+
+      // OpenReview API 需要至少一个必需参数
+      // 使用 invitation 参数搜索顶级会议
+      const topConferences = [
+        'ICLR.cc/2024/Conference/-/Submission',
+        'NeurIPS.cc/2023/Conference/-/Submission',
+        'ICML.cc/2024/Conference/-/Submission'
+      ];
+
+      const allPapers: PaperMetadata[] = [];
+
+      // 并行搜索多个会议
+      for (const invitation of topConferences.slice(0, 1)) { // 先只搜索一个会议避免太慢
+        try {
+          const response = await axios.get(`${this.baseUrl}/notes`, {
+            params: {
+              invitation,
+              limit: Math.min(limit * 2, 100),
+              details: 'replyCount,invitation'
+            },
+            timeout: 15000,
+            headers: {
+              'User-Agent': 'ArXiv-MCP-Server/1.0'
+            }
+          });
+
+          const notes = response.data.notes || [];
+          const papers = notes.map((note: any) => {
+            const content = note.content || {};
+            return {
+              id: note.id,
+              title: content.title?.value || content.title || '',
+              abstract: content.abstract?.value || content.abstract || '',
+              authors: content.authors?.value || content.authors || [],
+              year: note.cdate ? new Date(note.cdate).getFullYear() : undefined,
+              publicationDate: note.cdate ? new Date(note.cdate).toISOString() : undefined,
+              venue: note.invitation?.split('/-/')[0] || 'OpenReview',
+              venueRank: this.getVenueRank(note.invitation),
+              pdfUrl: content.pdf?.value || undefined,
+              sourceUrl: `https://openreview.net/forum?id=${note.id}`,
+              source: 'openreview',
+              peerReviewStatus: 'preprint'
+            };
+          });
+
+          allPapers.push(...papers);
+        } catch (err) {
+          console.error(`搜索 ${invitation} 失败:`, err instanceof Error ? err.message : String(err));
+        }
+      }
+
+      // 本地过滤：标题或摘要包含查询关键词
+      const query = filters.query.toLowerCase();
+      const filteredPapers = allPapers.filter(paper => {
+        const titleMatch = paper.title.toLowerCase().includes(query);
+        const abstractMatch = paper.abstract?.toLowerCase().includes(query);
+        return titleMatch || abstractMatch;
+      }).slice(0, limit);
 
       const result: SearchResult = {
-        totalResults: notes.length,
-        papers
+        totalResults: filteredPapers.length,
+        papers: filteredPapers
       };
 
       storage.db.setCache(cacheKey, result, this.cacheTTL);
-      console.log(`✅ 找到 ${papers.length} 篇论文`);
+      console.log(`✅ 找到 ${filteredPapers.length} 篇论文`);
 
       return result;
     } catch (error) {
       console.error('OpenReview 搜索失败:', error);
-      throw new Error(`OpenReview 搜索失败: ${error instanceof Error ? error.message : String(error)}`);
+      // 返回空结果而不是抛出错误，避免影响其他数据源
+      return { totalResults: 0, papers: [] };
     }
   }
 

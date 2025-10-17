@@ -22,12 +22,13 @@ export class PapersWithCodeDataSource extends AcademicDataSource {
       }
 
       const itemsPerPage = Math.min(filters.maxResults || 30, 50);
-      
+
       console.log(`🔍 搜索 Papers With Code: ${filters.query}`);
-      
+
+      // Papers With Code API 不支持全文搜索
+      // 改为获取最新论文或热门论文
       const response = await axios.get(`${this.baseUrl}/papers/`, {
         params: {
-          q: filters.query,
           items_per_page: itemsPerPage
         },
         timeout: 15000,
@@ -37,8 +38,9 @@ export class PapersWithCodeDataSource extends AcademicDataSource {
       });
 
       const results = response.data.results || [];
-      
-      const papers: PaperMetadata[] = results.map((paper: any) => ({
+
+      // 将所有论文转换为 PaperMetadata
+      const allPapers: PaperMetadata[] = results.map((paper: any) => ({
         id: paper.id || paper.paper_url?.split('/').pop() || '',
         title: paper.title || '',
         abstract: paper.abstract || '',
@@ -52,18 +54,27 @@ export class PapersWithCodeDataSource extends AcademicDataSource {
         arxivId: paper.arxiv_id || undefined
       }));
 
+      // 本地过滤：标题或摘要包含查询关键词
+      const query = filters.query.toLowerCase();
+      const filteredPapers = allPapers.filter(paper => {
+        const titleMatch = paper.title.toLowerCase().includes(query);
+        const abstractMatch = paper.abstract?.toLowerCase().includes(query);
+        return titleMatch || abstractMatch;
+      });
+
       const result: SearchResult = {
-        totalResults: response.data.count || papers.length,
-        papers
+        totalResults: filteredPapers.length,
+        papers: filteredPapers
       };
 
       storage.db.setCache(cacheKey, result, this.cacheTTL);
-      console.log(`✅ 找到 ${papers.length} 篇论文`);
+      console.log(`✅ 找到 ${filteredPapers.length} 篇论文`);
 
       return result;
     } catch (error) {
       console.error('Papers With Code 搜索失败:', error);
-      throw new Error(`Papers With Code 搜索失败: ${error instanceof Error ? error.message : String(error)}`);
+      // 返回空结果而不是抛出错误
+      return { totalResults: 0, papers: [] };
     }
   }
 
