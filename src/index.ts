@@ -13,37 +13,9 @@ import * as path from "path";
 import { promisify } from "util";
 import { exec } from "child_process";
 import { PdfReader } from "pdfreader";
+import { storage } from './storage/StorageManager.js';
 
 const execAsync = promisify(exec);
-
-// 工作目录设置 - 必须设置环境变量
-const WORK_DIR_ENV = process.env.WORK_DIR;
-
-// 检查 WORK_DIR 是否设置
-if (!WORK_DIR_ENV) {
-  console.error("❌ 错误: 必须设置 WORK_DIR 环境变量");
-  console.error("请设置工作目录，例如:");
-  console.error("  export WORK_DIR=/path/to/your/work/directory");
-  console.error("  或者在运行时指定: WORK_DIR=/path/to/dir node server.js");
-  process.exit(1);
-}
-
-// 现在 WORK_DIR 确保是 string 类型
-const WORK_DIR: string = WORK_DIR_ENV;
-
-// 确保工作目录存在
-try {
-  if (!fs.existsSync(WORK_DIR)) {
-    fs.mkdirSync(WORK_DIR, { recursive: true });
-    console.log(`✅ 工作目录已创建: ${WORK_DIR}`);
-  } else {
-    console.log(`✅ 使用工作目录: ${WORK_DIR}`);
-  }
-} catch (error) {
-  console.error(`❌ 无法创建或访问工作目录 ${WORK_DIR}:`, error);
-  console.error("请检查路径是否正确且有写入权限");
-  process.exit(1);
-}
 
 // SiliconFlow API配置
 const SILICONFLOW_API_URL = "https://api.siliconflow.cn/v1/chat/completions";
@@ -65,7 +37,7 @@ const arxivClient = new ArXivClient({});
 const server = new Server(
   {
     name: "arxiv-mcp-server",
-    version: "1.1.6",
+    version: "1.2.0",
   },
   {
     capabilities: {
@@ -127,9 +99,9 @@ async function downloadArxivPdf(input: string): Promise<string> {
     }
 
     const cleanArxivId = arxivId.replace(/v\d+$/, '');
-    const pdfPath = path.join(WORK_DIR, `${cleanArxivId}.pdf`);
-    
-    if (fs.existsSync(pdfPath)) {
+    const pdfPath = storage.getPdfPath(cleanArxivId);
+
+    if (storage.pdfExists(cleanArxivId)) {
       console.log(`PDF 文件已存在: ${pdfPath}`);
       return pdfPath;
     }
@@ -139,29 +111,16 @@ async function downloadArxivPdf(input: string): Promise<string> {
     const response = await axios({
       method: 'GET',
       url: pdfUrl,
-      responseType: 'stream',
+      responseType: 'arraybuffer',
       timeout: 30000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; ArXiv-MCP-Server/1.0)'
       }
     });
 
-    const writer = fs.createWriteStream(pdfPath);
-    response.data.pipe(writer);
-
-    return new Promise<string>((resolve, reject) => {
-      writer.on('finish', () => {
-        console.log(`PDF 下载完成: ${pdfPath}`);
-        resolve(pdfPath);
-      });
-      writer.on('error', (error) => {
-        console.error(`PDF 下载失败: ${error}`);
-        if (fs.existsSync(pdfPath)) {
-          fs.unlinkSync(pdfPath);
-        }
-        reject(error);
-      });
-    });
+    storage.savePdf(cleanArxivId, Buffer.from(response.data));
+    console.log(`PDF 下载完成: ${pdfPath}`);
+    return pdfPath;
   } catch (error) {
     console.error("下载 PDF 时出错:", error);
     throw new Error(`下载失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -169,7 +128,7 @@ async function downloadArxivPdf(input: string): Promise<string> {
 }
 
 // 工具函数：使用 AI 模型
-async function callSiliconFlowAPI(prompt: string, systemPrompt?: string): Promise<string> {
+async function callSiliconFlowAPI(prompt: string, systemPrompt?: string, options?: { temperature?: number; top_p?: number }): Promise<string> {
   try {
     const messages: Array<{role: string, content: string}> = [];
     if (systemPrompt) {
@@ -177,13 +136,16 @@ async function callSiliconFlowAPI(prompt: string, systemPrompt?: string): Promis
     }
     messages.push({ role: "user", content: prompt });
 
+    const temperature = options?.temperature ?? 0.7;
+    const top_p = options?.top_p ?? 0.7;
+
     const response = await axios.post(SILICONFLOW_API_URL, {
       model: "Qwen/Qwen3-8B", // 可选 deepseek-ai/DeepSeek-V3
       messages: messages,
       stream: false,
       max_tokens: 8192,
-      temperature: 0.7,
-      top_p: 0.7,
+      temperature: temperature,
+      top_p: top_p,
     }, {
       headers: {
         "Authorization": `Bearer ${SILICONFLOW_API_KEY}`,
@@ -224,11 +186,12 @@ async function extractPdfText(pdfPath: string): Promise<string> {
 async function parsePdfToText(pdfPath: string, arxivId: string, paperInfo?: any): Promise<string> {
   try {
     const cleanArxivId = arxivId.replace(/v\d+$/, '');
-    const textPath = path.join(WORK_DIR, `${cleanArxivId}_text.txt`);
+    const textPath = storage.getTextPath(cleanArxivId);
 
-    if (fs.existsSync(textPath)) {
+    const existingText = storage.readText(cleanArxivId);
+    if (existingText) {
       console.log(`文本文件已存在: ${textPath}`);
-      return fs.readFileSync(textPath, 'utf-8');
+      return existingText;
     }
 
     const pdfText = await extractPdfText(pdfPath);
@@ -251,8 +214,7 @@ async function parsePdfToText(pdfPath: string, arxivId: string, paperInfo?: any)
 
     outputContent += pdfText;
 
-    fs.writeFileSync(textPath, outputContent, 'utf-8');
-    console.log(`文本文件已保存: ${textPath}`);
+    storage.saveText(cleanArxivId, outputContent);
 
     return outputContent;
   } catch (error) {
@@ -265,7 +227,7 @@ async function parsePdfToText(pdfPath: string, arxivId: string, paperInfo?: any)
 async function convertToWechatArticle(textContent: string, arxivId: string): Promise<string> {
   try {
     const cleanArxivId = arxivId.replace(/v\d+$/, '');
-    const wechatPath = path.join(WORK_DIR, `${cleanArxivId}_wechat.md`);
+    const wechatPath = path.join(storage.TEXTS_DIR, `${cleanArxivId}_wechat.md`);
 
     if (fs.existsSync(wechatPath)) {
       return fs.readFileSync(wechatPath, 'utf-8');
@@ -302,11 +264,96 @@ ${textContent}
   }
 }
 
+
+// 工具函数：增强版学术文献综述（博士思维 + Mermaid可视化）
+async function convertToAcademicReviewEnhanced(textContent: string, arxivId: string): Promise<string> {
+  try {
+    const cleanArxivId = arxivId.replace(/v\d+$/, '');
+    const reviewPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_review_enhanced.md`);
+
+    if (fs.existsSync(reviewPath)) {
+      return fs.readFileSync(reviewPath, 'utf-8');
+    }
+
+    // 系统提示：研究生/博士分析思维 + 可视化指导
+    const systemPrompt = `你是一位资深科研工作者和学术编辑，擅长撰写科研论文综述。
+请以研究生/博士的视角分析论文：
+- 聚焦该论文内容，不扩展到其他文献（除非论文中明确提及）
+- 分析研究背景、核心问题、方法、实验、结果和局限
+- 对方法与实验提出批判性问题和潜在改进点
+- 使用逻辑清晰的推理和分析，突出思考过程
+- 尝试用 Mermaid 生成流程图或结构图展示方法、实验流程或研究结构
+- 输出面向科研人员，风格正式、客观、分析性强
+- 保持 Markdown 格式，段落清晰
+- 生成时尽量低发散（temperature ≈ 0.3）`;
+
+    const prompt = `请将以下论文解读内容转换为一篇专业的学术综述文（仅分析该论文内容）：
+    
+${textContent}
+
+输出要求：
+1. 摘要：概述研究主题、意义及关键问题
+2. 背景与研究问题：分析论文提出的问题和研究动机
+3. 方法与技术分析：
+   - 详细解析方法原理和创新点
+   - 提出研究思路中潜在问题或可改进之处
+   - 尽量用 Mermaid 可视化方法流程或模型结构
+4. 实验与结果讨论：
+   - 分析实验设计合理性、数据可靠性、结果解释
+   - 提出可能存在的实验局限或改进建议
+   - 用 Mermaid 可视化实验流程或关键数据关系
+5. 局限性与未来方向：批判性分析，给出改进思路或未来研究方向
+6. 总结与展望：概述论文贡献及研究价值
+
+请确保：
+- 仅分析本文内容，不进行外部文献对比
+- 从研究生/博士角度提出问题、疑问点和改进建议
+- Markdown 格式清晰，段落分明
+- 尽可能使用 Mermaid 可视化关键流程和结构`;
+
+    // 调用模型，低发散
+    const reviewContent = await callSiliconFlowAPI(prompt, systemPrompt, { temperature: 0.3 });
+
+    fs.writeFileSync(reviewPath, reviewContent, 'utf-8');
+
+    return reviewContent;
+  } catch (error) {
+    console.error("转换增强版学术综述时出错:", error);
+    throw new Error(`增强版文献综述转换失败: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // 新增工具函数：解析 PDF 并返回 LLM 翻译后的中文 Markdown
 async function parsePdfToMarkdown(pdfPath: string, arxivId: string, paperInfo?: any): Promise<string> {
   try {
     const cleanArxivId = arxivId.replace(/v\d+$/, '');
-    const mdPath = path.join(WORK_DIR, `${cleanArxivId}_md_zh.md`);
+    const mdPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_md_zh.md`);
 
     if (fs.existsSync(mdPath)) {
       return fs.readFileSync(mdPath, 'utf-8');
@@ -439,6 +486,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
+        name: "convert_to_academic_review_enhanced",
+        description: "转换为增强版学术文献综述（包含博士思维分析和Mermaid可视化）",
+        inputSchema: {
+          type: "object",
+          properties: {
+            arxivId: {
+              type: "string",
+              description: "arXiv 论文ID"
+            }
+          },
+          required: ["arxivId"]
+        }
+      },
+      {
         name: "process_arxiv_paper",
         description: "完整流程处理 arXiv 论文（搜索、下载、解析、转换）",
         inputSchema: {
@@ -507,14 +568,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "parse_pdf_to_text": {
         const { arxivId, paperInfo } = args as { arxivId: string; paperInfo?: any };
         const cleanArxivId = arxivId.replace(/v\d+$/, '');
-        const pdfPath = path.join(WORK_DIR, `${cleanArxivId}.pdf`);
+        const pdfPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}.pdf`);
 
         if (!fs.existsSync(pdfPath)) {
           throw new Error(`PDF 文件不存在，请先下载: ${pdfPath}`);
         }
 
         const extractedText = await parsePdfToText(pdfPath, arxivId, paperInfo);
-        const textPath = path.join(WORK_DIR, `${cleanArxivId}_text.txt`);
+        const textPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_text.txt`);
         return {
           content: [{
             type: "text",
@@ -527,7 +588,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "convert_to_wechat_article": {
         const { arxivId } = args as { arxivId: string };
         const cleanArxivId = arxivId.replace(/v\d+$/, '');
-        const textPath = path.join(WORK_DIR, `${cleanArxivId}_text.txt`);
+        const textPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_text.txt`);
 
         if (!fs.existsSync(textPath)) {
           throw new Error(`文本文件不存在，请先解析 PDF: ${textPath}`);
@@ -535,7 +596,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const textContent = fs.readFileSync(textPath, 'utf-8');
         const wechatContent = await convertToWechatArticle(textContent, arxivId);
-        const wechatPath = path.join(WORK_DIR, `${cleanArxivId}_wechat.md`);
+        const wechatPath = path.join(storage.TEXTS_DIR, `${cleanArxivId}_wechat.md`);
 
         return {
           content: [{
@@ -550,20 +611,42 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "parse_pdf_to_markdown": {
         const { arxivId, paperInfo } = args as { arxivId: string; paperInfo?: any };
         const cleanArxivId = arxivId.replace(/v\d+$/, '');
-        const pdfPath = path.join(WORK_DIR, `${cleanArxivId}.pdf`);
+        const pdfPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}.pdf`);
 
         if (!fs.existsSync(pdfPath)) {
           throw new Error(`PDF 文件不存在，请先下载: ${pdfPath}`);
         }
 
         const markdown = await parsePdfToMarkdown(pdfPath, arxivId, paperInfo);
-        const mdPath = path.join(WORK_DIR, `${cleanArxivId}_md_zh.md`);
+        const mdPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_md_zh.md`);
 
         return {
           content: [{
             type: "text",
             text: markdown,
             file: path.basename(mdPath)
+          }]
+        };
+      }
+
+      case "convert_to_academic_review_enhanced": {
+        const { arxivId } = args as { arxivId: string };
+        const cleanArxivId = arxivId.replace(/v\d+$/, '');
+        const textPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_text.txt`);
+
+        if (!fs.existsSync(textPath)) {
+          throw new Error(`文本文件不存在，请先解析 PDF: ${textPath}`);
+        }
+
+        const textContent = fs.readFileSync(textPath, 'utf-8');
+        const reviewContent = await convertToAcademicReviewEnhanced(textContent, arxivId);
+        const reviewPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_review_enhanced.md`);
+
+        return {
+          content: [{
+            type: "text",
+            text: reviewContent,
+            file: path.basename(reviewPath)
           }]
         };
       }
@@ -593,17 +676,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         results.push("步骤 2: 解析 PDF 并提取文本内容...");
         const extractedText = await parsePdfToText(pdfPath, arxivId, paperInfo);
-        const textPath = path.join(WORK_DIR, `${arxivId.replace(/v\d+$/, '')}_text.txt`);
+        const textPath = path.join(storage.GENERATED_DIR, `${arxivId.replace(/v\d+$/, '')}_text.txt`);
         results.push(`✅ PDF 文本提取完成，文件: ${path.basename(textPath)}`);
 
         if (includeWechat) {
           results.push("步骤 3: 转换为微信文章格式...");
           await convertToWechatArticle(extractedText, arxivId);
-          const wechatPath = path.join(WORK_DIR, `${arxivId.replace(/v\d+$/, '')}_wechat.md`);
+          const wechatPath = path.join(storage.GENERATED_DIR, `${arxivId.replace(/v\d+$/, '')}_wechat.md`);
           results.push(`✅ 微信文章生成完成，文件: ${path.basename(wechatPath)}`);
         }
 
-        results.push(`\n🎉 论文 ${arxivId} 处理完成！所有文件保存在: ${WORK_DIR}`);
+        results.push(`\n🎉 论文 ${arxivId} 处理完成！所有文件保存在: ${storage.GENERATED_DIR}`);
 
         if (paperInfo) {
           results.push(`\n📄 论文信息：`);
@@ -622,7 +705,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       // 新增：清空工作区所有文件
       case "clear_workdir": {
-        const files = fs.readdirSync(WORK_DIR).map(f => path.join(WORK_DIR, f));
+        const files = fs.readdirSync(storage.GENERATED_DIR).map(f => path.join(storage.GENERATED_DIR, f));
         const removed: string[] = [];
         for (const file of files) {
           try {
@@ -659,7 +742,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 // 启动服务器
 console.log("启动 ArXiv MCP Server...");
-console.log(`✅ 工作目录已设置: ${WORK_DIR}`);
+console.log(`✅ 存储目录: ${storage.STORAGE_ROOT}`);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

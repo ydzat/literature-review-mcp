@@ -8,7 +8,7 @@
     },
     "type": "module",
     "scripts": {
-        "build": "tsc && chmod +x build/index.js",
+        "build": "tsc && chmod +x build/index.js && cp src/database/schema.sql build/database/",
         "start": "node build/index.js",
         "dev": "tsx src/index.ts",
         "prepublishOnly": "npm run build"
@@ -45,7 +45,9 @@
     "dependencies": {
         "@agentic/arxiv": "^7.6.7",
         "@modelcontextprotocol/sdk": "^0.6.0",
+        "@types/better-sqlite3": "^7.6.13",
         "axios": "^1.6.0",
+        "better-sqlite3": "^12.4.1",
         "pdf-parse": "^1.1.1",
         "pdfreader": "^3.0.7"
     },
