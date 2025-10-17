@@ -61,7 +61,7 @@ export class StorageManager {
     // 初始化配置文件
     if (!fs.existsSync(this.CONFIG_PATH)) {
       const defaultConfig = {
-        version: '1.0.0',
+        version: '1.3.0',
         cacheEnabled: true,
         cacheTtl: {
           papers: 7 * 24 * 60 * 60,      // 7 天
@@ -72,9 +72,17 @@ export class StorageManager {
         notionIntegration: {
           enabled: true,
           autoSync: false
+        },
+        llm: {
+          provider: 'siliconflow',  // 'siliconflow' | 'openai' | 'custom'
+          model: 'Qwen/Qwen2.5-7B-Instruct',
+          // apiKey: '',  // 从环境变量读取
+          // baseUrl: '',  // 可选，自定义 API 端点
+          // maxTokens: 4096,  // 可选，不设置则自动从模型信息获取
+          temperature: 0.3  // 默认温度
         }
       };
-      
+
       fs.writeFileSync(this.CONFIG_PATH, JSON.stringify(defaultConfig, null, 2));
       console.log(`✅ 配置文件已创建: ${this.CONFIG_PATH}`);
     }

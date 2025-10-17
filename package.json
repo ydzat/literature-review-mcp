@@ -55,8 +55,10 @@
         "axios": "^1.6.0",
         "better-sqlite3": "^12.4.1",
         "canvas": "^3.2.0",
+        "dotenv": "^17.2.3",
         "pdfjs-dist": "^5.4.296",
-        "pdfreader": "^3.0.7"
+        "pdfreader": "^3.0.7",
+        "tiktoken": "^1.0.22"
     },
     "devDependencies": {
         "@types/node": "^20.0.0",

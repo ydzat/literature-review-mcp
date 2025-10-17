@@ -3,8 +3,17 @@
  * 基于多篇论文的单篇分析，生成跨论文的综合文献综述
  */
 
-import axios from 'axios';
 import { storage } from '../storage/StorageManager.js';
+import { createLLMProvider, LLMProvider } from '../llm/LLMProvider.js';
+
+// 延迟初始化 LLM Provider（在第一次使用时创建）
+let llm: LLMProvider | null = null;
+function getLLM(): LLMProvider {
+  if (!llm) {
+    llm = createLLMProvider();
+  }
+  return llm;
+}
 
 export interface UnifiedReviewOptions {
   temperature?: number;  // AI 温度参数，默认 0.4
@@ -26,11 +35,6 @@ async function generateUnifiedReview(
   individualReviews: Array<{ arxivId: string; title: string; review: string }>,
   options: Required<UnifiedReviewOptions>
 ): Promise<string> {
-  const SILICONFLOW_API_KEY = process.env.SILICONFLOW_API_KEY;
-  if (!SILICONFLOW_API_KEY) {
-    throw new Error('SILICONFLOW_API_KEY 未设置');
-  }
-
   const systemPrompt = `你是一位资深的学术研究者，专门负责撰写高质量的文献综述。
 
 **核心要求**：
@@ -90,31 +94,17 @@ ${reviewsText}
     const totalInputLength = systemPrompt.length + userPrompt.length;
     console.log(`  🤖 调用 AI 生成统一综述（${individualReviews.length} 篇论文，输入长度: ${totalInputLength} 字符）...`);
 
-    const response = await axios.post(
-      'https://api.siliconflow.cn/v1/chat/completions',
-      {
-        model: 'Qwen/Qwen2.5-7B-Instruct',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: options.temperature,
-        max_tokens: 4000,  // API 限制最大 4096
-        stream: false
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${SILICONFLOW_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 180000  // 3 分钟超时
-      }
-    );
+    const response = await getLLM().chat({
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      temperature: options.temperature
+    });
 
-    return response.data.choices[0].message.content;
+    return response.content;
   } catch (error: any) {
-    const errorDetail = error.response?.data ? JSON.stringify(error.response.data) : error.message;
-    throw new Error(`AI 调用失败: ${errorDetail}`);
+    throw new Error(`AI 调用失败: ${error.message}`);
   }
 }
 
