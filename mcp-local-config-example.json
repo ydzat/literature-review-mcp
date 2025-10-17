@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "arxiv-mcp-server": {
+      "command": "node",
+      "args": ["/path/to/your/arxiv-mcp-server/build/index.js"],
+      "env": {
+        "SILICONFLOW_API_KEY": "your_siliconflow_api_key_here",
+        "ARXIV_MCP_STORAGE": "/path/to/your/.arxiv-mcp"
+      }
+    }
+  }
+}
+

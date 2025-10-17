@@ -227,7 +227,8 @@ async function parsePdfToText(pdfPath: string, arxivId: string, paperInfo?: any)
 async function convertToWechatArticle(textContent: string, arxivId: string): Promise<string> {
   try {
     const cleanArxivId = arxivId.replace(/v\d+$/, '');
-    const wechatPath = path.join(storage.TEXTS_DIR, `${cleanArxivId}_wechat.md`);
+    // wechat文章保存到GENERATED_DIR
+    const wechatPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_wechat.md`);
 
     if (fs.existsSync(wechatPath)) {
       return fs.readFileSync(wechatPath, 'utf-8');
@@ -602,14 +603,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "parse_pdf_to_text": {
         const { arxivId, paperInfo } = args as { arxivId: string; paperInfo?: any };
         const cleanArxivId = arxivId.replace(/v\d+$/, '');
-        const pdfPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}.pdf`);
+        // PDF应该从PDFS_DIR读取
+        const pdfPath = storage.getPdfPath(cleanArxivId);
 
-        if (!fs.existsSync(pdfPath)) {
+        if (!storage.pdfExists(cleanArxivId)) {
           throw new Error(`PDF 文件不存在，请先下载: ${pdfPath}`);
         }
 
         const extractedText = await parsePdfToText(pdfPath, arxivId, paperInfo);
-        const textPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_text.txt`);
+        const textPath = storage.getTextPath(cleanArxivId);
         return {
           content: [{
             type: "text",
@@ -622,15 +624,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "convert_to_wechat_article": {
         const { arxivId } = args as { arxivId: string };
         const cleanArxivId = arxivId.replace(/v\d+$/, '');
-        const textPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_text.txt`);
+        // 文本应该从TEXTS_DIR读取
+        const textPath = storage.getTextPath(cleanArxivId);
 
-        if (!fs.existsSync(textPath)) {
+        if (!storage.textExists(cleanArxivId)) {
           throw new Error(`文本文件不存在，请先解析 PDF: ${textPath}`);
         }
 
-        const textContent = fs.readFileSync(textPath, 'utf-8');
+        const textContent = storage.readText(cleanArxivId)!;
         const wechatContent = await convertToWechatArticle(textContent, arxivId);
-        const wechatPath = path.join(storage.TEXTS_DIR, `${cleanArxivId}_wechat.md`);
+        // wechat文章保存到GENERATED_DIR
+        const wechatPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_wechat.md`);
 
         return {
           content: [{
@@ -645,9 +649,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "parse_pdf_to_markdown": {
         const { arxivId, paperInfo } = args as { arxivId: string; paperInfo?: any };
         const cleanArxivId = arxivId.replace(/v\d+$/, '');
-        const pdfPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}.pdf`);
+        // PDF应该从PDFS_DIR读取
+        const pdfPath = storage.getPdfPath(cleanArxivId);
 
-        if (!fs.existsSync(pdfPath)) {
+        if (!storage.pdfExists(cleanArxivId)) {
           throw new Error(`PDF 文件不存在，请先下载: ${pdfPath}`);
         }
 
@@ -666,13 +671,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "convert_to_academic_review_enhanced": {
         const { arxivId } = args as { arxivId: string };
         const cleanArxivId = arxivId.replace(/v\d+$/, '');
-        const textPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_text.txt`);
+        // 文本应该从TEXTS_DIR读取
+        const textPath = storage.getTextPath(cleanArxivId);
 
-        if (!fs.existsSync(textPath)) {
+        if (!storage.textExists(cleanArxivId)) {
           throw new Error(`文本文件不存在，请先解析 PDF: ${textPath}`);
         }
 
-        const textContent = fs.readFileSync(textPath, 'utf-8');
+        const textContent = storage.readText(cleanArxivId)!;
         const reviewContent = await convertToAcademicReviewEnhanced(textContent, arxivId);
         const reviewPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_review_enhanced.md`);
 
@@ -710,17 +716,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         results.push("步骤 2: 解析 PDF 并提取文本内容...");
         const extractedText = await parsePdfToText(pdfPath, arxivId, paperInfo);
-        const textPath = path.join(storage.GENERATED_DIR, `${arxivId.replace(/v\d+$/, '')}_text.txt`);
+        const cleanArxivId = arxivId.replace(/v\d+$/, '');
+        const textPath = storage.getTextPath(cleanArxivId);
         results.push(`✅ PDF 文本提取完成，文件: ${path.basename(textPath)}`);
 
         if (includeWechat) {
           results.push("步骤 3: 转换为微信文章格式...");
           await convertToWechatArticle(extractedText, arxivId);
-          const wechatPath = path.join(storage.GENERATED_DIR, `${arxivId.replace(/v\d+$/, '')}_wechat.md`);
+          const wechatPath = path.join(storage.GENERATED_DIR, `${cleanArxivId}_wechat.md`);
           results.push(`✅ 微信文章生成完成，文件: ${path.basename(wechatPath)}`);
         }
 
-        results.push(`\n🎉 论文 ${arxivId} 处理完成！所有文件保存在: ${storage.GENERATED_DIR}`);
+        results.push(`\n🎉 论文 ${arxivId} 处理完成！`);
+        results.push(`PDF 保存在: ${storage.PDFS_DIR}`);
+        results.push(`文本保存在: ${storage.TEXTS_DIR}`);
+        results.push(`生成文件保存在: ${storage.GENERATED_DIR}`);
 
         if (paperInfo) {
           results.push(`\n📄 论文信息：`);

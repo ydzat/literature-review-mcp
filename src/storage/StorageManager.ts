@@ -17,8 +17,9 @@ export class StorageManager {
   public db: DatabaseManager;
 
   private constructor() {
-    // 使用用户主目录下的隐藏目录
-    this.STORAGE_ROOT = path.join(os.homedir(), '.arxiv-mcp');
+    // 优先使用环境变量 ARXIV_MCP_STORAGE，否则使用用户主目录
+    const storageRoot = process.env.ARXIV_MCP_STORAGE || path.join(os.homedir(), '.arxiv-mcp');
+    this.STORAGE_ROOT = storageRoot;
     this.DB_PATH = path.join(this.STORAGE_ROOT, 'arxiv-mcp.db');
     this.PDFS_DIR = path.join(this.STORAGE_ROOT, 'pdfs');
     this.TEXTS_DIR = path.join(this.STORAGE_ROOT, 'texts');
