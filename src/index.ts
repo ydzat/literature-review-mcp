@@ -49,6 +49,15 @@ const server = new Server(
 // 工具函数：搜索 arXiv 论文
 async function searchArxivPapers(query: string, maxResults: number = 5): Promise<{totalResults: number, papers: any[]}> {
   try {
+    // 1. 先检查缓存
+    const cacheKey = `arxiv_search:${query}:${maxResults}`;
+    const cached = storage.db.getCache(cacheKey);
+    if (cached) {
+      console.log('✅ 使用缓存的搜索结果');
+      return cached;
+    }
+
+    // 2. 调用 arXiv API
     const results = await arxivClient.search({
       start: 0,
       searchQuery: {
@@ -59,9 +68,32 @@ async function searchArxivPapers(query: string, maxResults: number = 5): Promise
       maxResults: maxResults
     });
 
+    // 3. 保存论文到数据库并构建返回结果
     const papers = results.entries.map(entry => {
       const urlParts = entry.url.split('/');
       const arxivId = urlParts[urlParts.length - 1];
+      const cleanArxivId = arxivId.replace(/v\d+$/, '');
+
+      // 保存到数据库
+      const paperData = {
+        arxiv_id: cleanArxivId,
+        title: entry.title.replace(/\s+/g, ' ').trim(),
+        abstract: entry.summary.replace(/\s+/g, ' ').trim(),
+        publication_date: entry.published,
+        pdf_url: entry.url.replace('/abs/', '/pdf/') + '.pdf',
+        source: 'arxiv'
+      };
+
+      const paperId = storage.db.insertOrUpdatePaper(paperData);
+
+      // 保存作者并建立关联
+      if (entry.authors && entry.authors.length > 0) {
+        entry.authors.forEach((author: any, index: number) => {
+          const authorName = author.name || author;
+          const authorId = storage.db.getOrCreateAuthor({ name: authorName });
+          storage.db.linkPaperAuthor(paperId, authorId, index + 1);
+        });
+      }
 
       return {
         id: arxivId,
@@ -73,10 +105,15 @@ async function searchArxivPapers(query: string, maxResults: number = 5): Promise
       };
     });
 
-    return {
+    const result = {
       totalResults: results.totalResults,
       papers: papers
     };
+
+    // 4. 缓存结果（1天）
+    storage.db.setCache(cacheKey, result, 24 * 60 * 60);
+
+    return result;
   } catch (error) {
     console.error("搜索 arXiv 论文时出错:", error);
     throw new Error(`搜索失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -120,6 +157,22 @@ async function downloadArxivPdf(input: string): Promise<string> {
 
     storage.savePdf(cleanArxivId, Buffer.from(response.data));
     console.log(`PDF 下载完成: ${pdfPath}`);
+
+    // 🆕 更新数据库
+    const paper = storage.db.getPaperByArxivId(cleanArxivId);
+    if (paper) {
+      storage.db.updatePaper(cleanArxivId, { pdf_path: pdfPath });
+    } else {
+      // 如果数据库中没有，创建基础记录
+      storage.db.insertOrUpdatePaper({
+        arxiv_id: cleanArxivId,
+        title: `arXiv:${cleanArxivId}`,
+        pdf_url: pdfUrl,
+        pdf_path: pdfPath,
+        source: 'arxiv'
+      });
+    }
+
     return pdfPath;
   } catch (error) {
     console.error("下载 PDF 时出错:", error);
@@ -214,7 +267,23 @@ async function parsePdfToText(pdfPath: string, arxivId: string, paperInfo?: any)
 
     outputContent += pdfText;
 
-    storage.saveText(cleanArxivId, outputContent);
+    const savedTextPath = storage.saveText(cleanArxivId, outputContent);
+
+    // 🆕 更新数据库
+    const paper = storage.db.getPaperByArxivId(cleanArxivId);
+    if (paper) {
+      storage.db.updatePaper(cleanArxivId, { text_path: savedTextPath });
+    } else {
+      // 创建基础记录
+      storage.db.insertOrUpdatePaper({
+        arxiv_id: cleanArxivId,
+        title: paperInfo?.title || `arXiv:${cleanArxivId}`,
+        abstract: paperInfo?.summary,
+        publication_date: paperInfo?.published,
+        text_path: savedTextPath,
+        source: 'arxiv'
+      });
+    }
 
     return outputContent;
   } catch (error) {
@@ -257,6 +326,13 @@ ${textContent}
     const wechatContent = await callSiliconFlowAPI(prompt, systemPrompt);
 
     fs.writeFileSync(wechatPath, wechatContent, 'utf-8');
+
+    // 🆕 更新数据库
+    const paper = storage.db.getPaperByArxivId(cleanArxivId);
+    if (paper) {
+      storage.db.updatePaper(cleanArxivId, { wechat_path: wechatPath });
+      console.log('✅ 微信文章路径已保存到数据库');
+    }
 
     return wechatContent;
   } catch (error) {
@@ -316,6 +392,23 @@ ${textContent}
     const reviewContent = await callSiliconFlowAPI(prompt, systemPrompt, { temperature: 0.3 });
 
     fs.writeFileSync(reviewPath, reviewContent, 'utf-8');
+
+    // 🆕 保存到数据库 reviews 表和 papers 表
+    const paper = storage.db.getPaperByArxivId(cleanArxivId);
+    if (paper) {
+      // 保存综述记录
+      storage.db.insertReview({
+        title: `${paper.title} - 学术综述`,
+        focus_area: 'single-paper-review',
+        content: reviewContent,
+        total_papers: 1,
+        total_words: reviewContent.length,
+        ai_generated_ratio: 1.0
+      });
+      // 更新论文的综述路径
+      storage.db.updatePaper(cleanArxivId, { review_path: reviewPath });
+      console.log('✅ 综述已保存到数据库');
+    }
 
     return reviewContent;
   } catch (error) {
@@ -380,6 +473,23 @@ async function parsePdfToMarkdown(pdfPath: string, arxivId: string, paperInfo?: 
     const markdown = await callSiliconFlowAPI(prompt, systemPrompt);
 
     fs.writeFileSync(mdPath, markdown, 'utf-8');
+
+    // 🆕 更新数据库
+    const paper = storage.db.getPaperByArxivId(cleanArxivId);
+    if (paper) {
+      storage.db.updatePaper(cleanArxivId, { markdown_path: mdPath });
+    } else {
+      // 创建基础记录
+      storage.db.insertOrUpdatePaper({
+        arxiv_id: cleanArxivId,
+        title: paperInfo?.title || `arXiv:${cleanArxivId}`,
+        abstract: paperInfo?.summary,
+        publication_date: paperInfo?.published,
+        markdown_path: mdPath,
+        source: 'arxiv'
+      });
+    }
+
     return markdown;
   } catch (error) {
     console.error("PDF 转 Markdown 时出错:", error);

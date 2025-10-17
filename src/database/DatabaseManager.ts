@@ -23,6 +23,9 @@ export interface Paper {
   pdf_url?: string;
   pdf_path?: string;
   text_path?: string;
+  markdown_path?: string;
+  wechat_path?: string;
+  review_path?: string;
   source?: string;
   quality_score?: number;
   author_reputation_score?: number;
@@ -111,11 +114,12 @@ export class DatabaseManager {
         arxiv_id, title, abstract, year, publication_date,
         venue, venue_rank, citation_count, impact_factor,
         peer_review_status, pdf_url, pdf_path, text_path,
+        markdown_path, wechat_path, review_path,
         source, quality_score, author_reputation_score,
         affiliation_tier_score, recency_bonus
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     const result = stmt.run(
       paper.arxiv_id,
       paper.title,
@@ -130,13 +134,16 @@ export class DatabaseManager {
       paper.pdf_url || null,
       paper.pdf_path || null,
       paper.text_path || null,
+      paper.markdown_path || null,
+      paper.wechat_path || null,
+      paper.review_path || null,
       paper.source || 'arxiv',
       paper.quality_score || null,
       paper.author_reputation_score || null,
       paper.affiliation_tier_score || null,
       paper.recency_bonus || null
     );
-    
+
     return result.lastInsertRowid as number;
   }
 
@@ -148,12 +155,21 @@ export class DatabaseManager {
   updatePaper(arxivId: string, updates: Partial<Paper>): void {
     const fields = Object.keys(updates).filter(k => k !== 'id' && k !== 'arxiv_id');
     if (fields.length === 0) return;
-    
+
     const setClause = fields.map(f => `${f} = ?`).join(', ');
     const values = fields.map(f => (updates as any)[f]);
-    
+
     const stmt = this.db.prepare(`UPDATE papers SET ${setClause} WHERE arxiv_id = ?`);
     stmt.run(...values, arxivId);
+  }
+
+  insertOrUpdatePaper(paper: Partial<Paper>): number {
+    const existing = this.getPaperByArxivId(paper.arxiv_id!);
+    if (existing) {
+      this.updatePaper(paper.arxiv_id!, paper);
+      return existing.id!;
+    }
+    return this.insertPaper(paper as Paper);
   }
 
   searchPapers(filters: {
@@ -227,12 +243,12 @@ export class DatabaseManager {
     return stmt.get(name) as Author | null;
   }
 
-  getOrCreateAuthor(author: Author): number {
-    const existing = this.getAuthorByName(author.name);
+  getOrCreateAuthor(author: Partial<Author>): number {
+    const existing = this.getAuthorByName(author.name!);
     if (existing) {
       return existing.id!;
     }
-    return this.insertAuthor(author);
+    return this.insertAuthor(author as Author);
   }
 
   // ============================================
@@ -310,6 +326,39 @@ export class DatabaseManager {
   }
 
   // ============================================
+  // 综述相关操作
+  // ============================================
+
+  insertReview(review: Omit<Review, 'id'>): number {
+    const stmt = this.db.prepare(`
+      INSERT INTO reviews (title, focus_area, content, total_papers, total_words, ai_generated_ratio, notion_page_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const result = stmt.run(
+      review.title,
+      review.focus_area || null,
+      review.content || null,
+      review.total_papers || null,
+      review.total_words || null,
+      review.ai_generated_ratio || null,
+      review.notion_page_id || null
+    );
+
+    return result.lastInsertRowid as number;
+  }
+
+  getReviewById(id: number): Review | null {
+    const stmt = this.db.prepare('SELECT * FROM reviews WHERE id = ?');
+    return stmt.get(id) as Review | null;
+  }
+
+  getAllReviews(): Review[] {
+    const stmt = this.db.prepare('SELECT * FROM reviews ORDER BY created_at DESC');
+    return stmt.all() as Review[];
+  }
+
+  // ============================================
   // 缓存操作
   // ============================================
 
@@ -318,14 +367,14 @@ export class DatabaseManager {
       SELECT cache_value, created_at, ttl FROM api_cache
       WHERE cache_key = ?
     `);
-    
+
     const row = stmt.get(key) as any;
     if (!row) return null;
-    
+
     // 检查是否过期
     const createdAt = new Date(row.created_at).getTime();
     const age = (Date.now() - createdAt) / 1000;
-    
+
     if (age > row.ttl) {
       this.deleteCache(key);
       return null;

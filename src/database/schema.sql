@@ -19,6 +19,9 @@ CREATE TABLE IF NOT EXISTS papers (
   pdf_url TEXT,
   pdf_path TEXT,
   text_path TEXT,
+  markdown_path TEXT,  -- 生成的中文 Markdown 路径
+  wechat_path TEXT,    -- 生成的微信文章路径
+  review_path TEXT,    -- 生成的学术综述路径
   source TEXT,  -- arxiv, dblp, openreview, paperswithcode, ieee, acm
   
   -- 质量评分
@@ -187,7 +190,7 @@ CREATE TABLE IF NOT EXISTS api_cache (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   cache_key TEXT UNIQUE NOT NULL,
   cache_value TEXT NOT NULL,  -- JSON
-  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  created_at TEXT DEFAULT (datetime('now', 'localtime')),
   ttl INTEGER DEFAULT 86400  -- 1 天
 );
 
