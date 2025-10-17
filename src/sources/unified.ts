@@ -3,6 +3,9 @@ import { dblp } from './dblp.js';
 import { openreview } from './openreview.js';
 import { paperswithcode } from './paperswithcode.js';
 import { storage } from '../storage/StorageManager.js';
+import { calculatePaperQualityScore } from '../reputation/scoring.js';
+import { formatSearchResultsForNotion, wrapWithNotionMetadata } from '../notion/formatters.js';
+import { ToolOutputWithNotion } from '../notion/types.js';
 
 /**
  * 统一搜索接口
@@ -243,19 +246,47 @@ export async function savePapersToDatabase(papers: PaperMetadata[]): Promise<num
 export async function getRecentPapers(days: number = 30, maxResults: number = 50): Promise<SearchResult> {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - days);
-  
+
   // 从 OpenReview 获取最新论文
   const openreviewPapers = await openreview.getRecentSubmissions(maxResults);
-  
+
   // 过滤日期
   const recentPapers = openreviewPapers.papers.filter(p => {
     if (!p.publicationDate) return false;
     return new Date(p.publicationDate) >= cutoffDate;
   });
-  
+
   return {
     totalResults: recentPapers.length,
     papers: recentPapers
   };
+}
+
+/**
+ * 搜索论文并返回 Notion 友好格式
+ */
+export async function searchWithNotionOutput(
+  filters: UnifiedSearchFilters
+): Promise<ToolOutputWithNotion<SearchResult>> {
+  // 执行搜索
+  const searchResult = await searchAcrossAllSources(filters);
+
+  // 计算质量评分
+  const qualityScores = new Map();
+  for (const paper of searchResult.papers) {
+    const score = calculatePaperQualityScore(paper);
+    qualityScores.set(paper.id, score);
+  }
+
+  // 生成 Notion 元数据
+  const notionMetadata = formatSearchResultsForNotion(
+    searchResult.papers,
+    qualityScores
+  );
+
+  // 生成摘要
+  const summary = `找到 ${searchResult.papers.length} 篇论文，来自 ${filters.sources?.join(', ') || '所有数据源'}`;
+
+  return wrapWithNotionMetadata(searchResult, notionMetadata, summary);
 }
 

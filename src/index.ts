@@ -527,6 +527,40 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {},
           required: []
         }
+      },
+      // 新增：多源学术搜索工具
+      {
+        name: "search_academic_papers",
+        description: "跨多个学术数据源搜索论文（DBLP、OpenReview、Papers With Code），返回 Notion 友好格式",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "搜索关键词"
+            },
+            maxResults: {
+              type: "number",
+              description: "最大结果数量",
+              default: 10
+            },
+            sources: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: ["dblp", "openreview", "paperswithcode"]
+              },
+              description: "数据源列表",
+              default: ["dblp", "openreview", "paperswithcode"]
+            },
+            minQualityScore: {
+              type: "number",
+              description: "最低质量评分（0-100）",
+              default: 0
+            }
+          },
+          required: ["query"]
+        }
       }
     ]
   };
@@ -722,6 +756,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             type: "text",
             text: `工作区清理完成，删除文件: ${removed.join(', ')}`,
             files: removed
+          }]
+        };
+      }
+
+      // 新增：多源学术搜索
+      case "search_academic_papers": {
+        const { searchWithNotionOutput } = await import('./sources/unified.js');
+        const { query, maxResults = 10, sources, minQualityScore = 0 } = args as {
+          query: string;
+          maxResults?: number;
+          sources?: string[];
+          minQualityScore?: number;
+        };
+
+        const result = await searchWithNotionOutput({
+          query,
+          maxResults,
+          sources: sources as any,
+          minQualityScore
+        });
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2)
           }]
         };
       }

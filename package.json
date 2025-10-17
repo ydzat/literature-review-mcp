@@ -1,7 +1,7 @@
 {
     "name": "@langgpt/arxiv-mcp-server",
-    "version": "1.1.6",
-    "description": "一个基于arxiv的论文解读器，将arxiv的论文转为通俗易懂的文章和语音",
+    "version": "1.2.0",
+    "description": "面向研究生论文级别文献综述的学术论文管理与分析工具，支持多源学术搜索、智能质量评估、Notion 知识库集成",
     "main": "build/index.js",
     "bin": {
         "arxiv-mcp-server": "build/index.js"
@@ -22,11 +22,17 @@
         "arxiv",
         "paper",
         "ai",
-        "translation",
-        "chinese",
-        "tts",
         "academic",
-        "research"
+        "research",
+        "literature-review",
+        "dblp",
+        "openreview",
+        "papers-with-code",
+        "notion",
+        "quality-assessment",
+        "citation-analysis",
+        "translation",
+        "chinese"
     ],
     "author": {
         "name": "yzfly",

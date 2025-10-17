@@ -131,3 +131,6 @@ DATA_DIR/
 
 # Test files
 test-data/
+
+# Design docs
+docs/
