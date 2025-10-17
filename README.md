@@ -48,16 +48,67 @@ arxiv-mcp-server
 在使用前，请设置以下环境变量：
 
 ```bash
-# 必需：SiliconFlow API Key
-export SILICONFLOW_API_KEY="your_api_key_here"
+# LLM Provider 配置（必需）
+export LLM_PROVIDER="siliconflow"  # 可选: siliconflow, openai, custom
+export LLM_API_KEY="your_api_key_here"
+
+# 可选配置
+export LLM_BASE_URL="https://api.siliconflow.cn/v1"  # 自定义 API 端点
+export LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"          # 指定模型
+export LLM_MAX_TOKENS="4096"                         # 最大输出 tokens（不设置则自动获取）
+export LLM_TEMPERATURE="0.3"                         # 温度参数（默认 0.7）
 ```
 
 **注意**：工作目录已自动设置为 `~/.arxiv-mcp/`，无需手动配置。
 
-### 获取 API Key
+### 支持的 LLM Provider
 
-请通过以下链接获取 SiliconFlow API Key：
-[https://cloud.siliconflow.cn/i/TxUlXG3u](https://cloud.siliconflow.cn/i/TxUlXG3u)
+#### 1. SiliconFlow（默认）
+```bash
+export LLM_PROVIDER="siliconflow"
+export LLM_API_KEY="your_siliconflow_key"
+# 可选：export LLM_MODEL="Qwen/Qwen2.5-7B-Instruct"
+```
+获取 API Key：[https://cloud.siliconflow.cn/i/TxUlXG3u](https://cloud.siliconflow.cn/i/TxUlXG3u)
+
+#### 2. OpenAI
+```bash
+export LLM_PROVIDER="openai"
+export LLM_API_KEY="your_openai_key"
+export LLM_MODEL="gpt-4o"
+```
+
+#### 3. Deepseek
+```bash
+export LLM_PROVIDER="custom"
+export LLM_BASE_URL="https://api.deepseek.com/v1"
+export LLM_API_KEY="your_deepseek_key"
+export LLM_MODEL="deepseek-chat"
+```
+
+#### 4. 其他 OpenAI 兼容 API
+```bash
+export LLM_PROVIDER="custom"
+export LLM_BASE_URL="https://your-api-endpoint/v1"
+export LLM_API_KEY="your_api_key"
+export LLM_MODEL="your_model_name"
+```
+
+### 智能压缩功能
+
+本工具内置**智能文本压缩系统**，可自动处理超长论文：
+
+- ✅ **精确 Token 计算**：使用 tiktoken 库精确计算 token 数
+- ✅ **章节识别**：自动识别论文结构（Abstract, Method, Conclusion 等）
+- ✅ **分级压缩**：根据章节重要性智能压缩
+  - Abstract/Method: 100% 保留
+  - Introduction/Conclusion: 90% 保留
+  - Experiment/Result: 80% 保留
+  - Reference: 0% 保留（完全丢弃）
+- ✅ **滚动压缩**：逐步合并，避免一次性处理超长文本
+- ✅ **语义压缩**：调用 LLM 进行智能压缩，而非简单截断
+
+**示例**：138K tokens 的超长论文 → 压缩到 38K tokens（压缩率 72.3%），同时保留核心信息
 
 ### 数据存储
 
@@ -73,6 +124,7 @@ export SILICONFLOW_API_KEY="your_api_key_here"
 
 在 Claude Desktop 的配置文件中添加：
 
+#### 使用 SiliconFlow（默认）
 ```json
 {
   "mcpServers": {
@@ -80,7 +132,43 @@ export SILICONFLOW_API_KEY="your_api_key_here"
       "command": "npx",
       "args": ["-y", "@langgpt/arxiv-mcp-server@latest"],
       "env": {
-        "SILICONFLOW_API_KEY": "your_api_key_here"
+        "LLM_PROVIDER": "siliconflow",
+        "LLM_API_KEY": "your_siliconflow_key"
+      }
+    }
+  }
+}
+```
+
+#### 使用 Deepseek
+```json
+{
+  "mcpServers": {
+    "arxiv-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "@langgpt/arxiv-mcp-server@latest"],
+      "env": {
+        "LLM_PROVIDER": "custom",
+        "LLM_BASE_URL": "https://api.deepseek.com/v1",
+        "LLM_API_KEY": "your_deepseek_key",
+        "LLM_MODEL": "deepseek-chat"
+      }
+    }
+  }
+}
+```
+
+#### 使用 OpenAI
+```json
+{
+  "mcpServers": {
+    "arxiv-mcp-server": {
+      "command": "npx",
+      "args": ["-y", "@langgpt/arxiv-mcp-server@latest"],
+      "env": {
+        "LLM_PROVIDER": "openai",
+        "LLM_API_KEY": "your_openai_key",
+        "LLM_MODEL": "gpt-4o"
       }
     }
   }
@@ -90,6 +178,7 @@ export SILICONFLOW_API_KEY="your_api_key_here"
 **注意**：
 - 工作目录已自动设置为 `~/.arxiv-mcp/`，无需配置 `WORK_DIR`
 - 如需使用 Notion 集成功能，请同时配置 Notion MCP Server
+- 兼容旧版配置：`SILICONFLOW_API_KEY` 仍然有效（会自动映射到 `LLM_API_KEY`）
 
 配置文件位置：
 - **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -232,8 +321,11 @@ cd arxiv-mcp-server
 # 安装依赖
 npm install
 
-# 设置环境变量
-export SILICONFLOW_API_KEY="your_api_key"
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑 .env 文件，配置你的 LLM Provider
+# vim .env
 
 # 开发模式运行
 npm run dev
@@ -243,6 +335,9 @@ npm run build
 
 # 运行构建版本
 npm start
+
+# 运行测试
+npm run build && node build/tests/test-literature-review.js
 ```
 
 ### 项目结构
@@ -297,7 +392,14 @@ arxiv-mcp-server/
 - **TypeScript** - 类型安全的 JavaScript
 - **Model Context Protocol (MCP)** - 标准化的 AI 上下文协议
 - **SQLite (better-sqlite3)** - 嵌入式数据库，高性能缓存
-- **SiliconFlow API** - AI 内容理解和生成
+- **多 LLM Provider 支持**：
+  - SiliconFlow API - 默认 AI 服务
+  - OpenAI API - GPT 系列模型
+  - Deepseek API - 高性价比推理模型
+  - 任何 OpenAI 兼容 API
+- **智能压缩**：
+  - tiktoken - 精确 token 计算
+  - pdfjs-dist - PDF 文本提取
 - **学术数据源**：
   - arXiv API - 预印本论文
   - DBLP API - 计算机科学文献
@@ -378,6 +480,23 @@ DEBUG=arxiv-mcp-server npx @langgpt/arxiv-mcp-server
 本项目采用 MIT 许可证。详情请见 [LICENSE](LICENSE) 文件。
 
 ## 更新日志
+
+### v1.3.0 (2025-10-18)
+
+- 作者：@ydzat
+
+- 🚀 **多 LLM Provider 支持**：支持 SiliconFlow、OpenAI、Deepseek 及任何 OpenAI 兼容 API
+- 🗜️ **智能文本压缩系统**：自动处理超长论文（138K tokens → 38K tokens，压缩率 72.3%）
+  - 精确 token 计算（tiktoken）
+  - 章节识别与分级压缩
+  - 滚动压缩策略
+  - 语义压缩（非简单截断）
+- 📥 **批量并发下载**：支持并发下载多篇论文 PDF，自动处理 DOI 链接
+- 🤖 **批量深度分析**：并发分析多篇论文，生成单篇深度综述
+- 📚 **统一文献综述**：基于单篇分析生成跨论文综合综述
+- 📤 **Notion 完整导出**：完整或增量导出到 Notion
+- 🔧 **环境变量配置**：支持 `.env` 文件配置
+- 📖 **完善文档**：更新 README、.env.example、配置示例
 
 ### v1.2.0 (2025-10-17)
 

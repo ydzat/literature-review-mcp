@@ -1,11 +1,30 @@
 {
   "mcpServers": {
-    "arxiv-mcp-server": {
+    "arxiv-mcp-server-siliconflow": {
       "command": "node",
       "args": ["/path/to/your/arxiv-mcp-server/build/index.js"],
       "env": {
-        "SILICONFLOW_API_KEY": "your_siliconflow_api_key_here",
-        "ARXIV_MCP_STORAGE": "/path/to/your/.arxiv-mcp"
+        "LLM_PROVIDER": "siliconflow",
+        "LLM_API_KEY": "your_siliconflow_api_key_here"
+      }
+    },
+    "arxiv-mcp-server-deepseek": {
+      "command": "node",
+      "args": ["/path/to/your/arxiv-mcp-server/build/index.js"],
+      "env": {
+        "LLM_PROVIDER": "custom",
+        "LLM_BASE_URL": "https://api.deepseek.com/v1",
+        "LLM_API_KEY": "your_deepseek_api_key_here",
+        "LLM_MODEL": "deepseek-chat"
+      }
+    },
+    "arxiv-mcp-server-openai": {
+      "command": "node",
+      "args": ["/path/to/your/arxiv-mcp-server/build/index.js"],
+      "env": {
+        "LLM_PROVIDER": "openai",
+        "LLM_API_KEY": "your_openai_api_key_here",
+        "LLM_MODEL": "gpt-4o"
       }
     }
   }
