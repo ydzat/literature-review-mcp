@@ -14,21 +14,32 @@ import { promisify } from "util";
 import { exec } from "child_process";
 import { PdfReader } from "pdfreader";
 import { storage } from './storage/StorageManager.js';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import dotenv from 'dotenv';
+import { createLLMProvider, LLMProvider } from './llm/LLMProvider.js';
+
+// 加载环境变量
+dotenv.config();
 
 const execAsync = promisify(exec);
 
-// SiliconFlow API配置
-const SILICONFLOW_API_URL = "https://api.siliconflow.cn/v1/chat/completions";
-const SILICONFLOW_API_KEY_ENV = process.env.SILICONFLOW_API_KEY;
+// 读取 package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJsonPath = path.join(__dirname, '../package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+const SERVER_NAME = packageJson.name;
+const SERVER_VERSION = packageJson.version;
 
-if (!SILICONFLOW_API_KEY_ENV) {
-  console.error("❌ 错误: 必须设置 SILICONFLOW_API_KEY 环境变量");
-  console.error("您可以通过以下链接获取 API key: https://cloud.siliconflow.cn/i/TxUlXG3u");
-  process.exit(1);
+// 延迟初始化 LLM Provider（在第一次使用时创建）
+let llm: LLMProvider | null = null;
+function getLLM(): LLMProvider {
+  if (!llm) {
+    llm = createLLMProvider();
+  }
+  return llm;
 }
-
-// 现在 SILICONFLOW_API_KEY 确保是 string 类型
-const SILICONFLOW_API_KEY: string = SILICONFLOW_API_KEY_ENV;
 
 // 初始化 ArXiv 客户端
 const arxivClient = new ArXivClient({});
@@ -36,8 +47,8 @@ const arxivClient = new ArXivClient({});
 // 创建 MCP 服务器
 const server = new Server(
   {
-    name: "arxiv-mcp-server",
-    version: "1.2.0",
+    name: SERVER_NAME,
+    version: SERVER_VERSION,
   },
   {
     capabilities: {
@@ -151,7 +162,7 @@ async function downloadArxivPdf(input: string): Promise<string> {
       responseType: 'arraybuffer',
       timeout: 30000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; ArXiv-MCP-Server/1.0)'
+        'User-Agent': `Mozilla/5.0 (compatible; ${SERVER_NAME}/${SERVER_VERSION})`
       }
     });
 
@@ -180,35 +191,25 @@ async function downloadArxivPdf(input: string): Promise<string> {
   }
 }
 
-// 工具函数：使用 AI 模型
-async function callSiliconFlowAPI(prompt: string, systemPrompt?: string, options?: { temperature?: number; top_p?: number }): Promise<string> {
+// 工具函数：使用 AI 模型（已废弃，使用 LLMProvider 代替）
+// 保留此函数以兼容旧代码，内部调用 LLMProvider
+async function callLLM(prompt: string, systemPrompt?: string, options?: { temperature?: number }): Promise<string> {
   try {
-    const messages: Array<{role: string, content: string}> = [];
+    const llmInstance = getLLM();
+    const messages: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [];
     if (systemPrompt) {
       messages.push({ role: "system", content: systemPrompt });
     }
     messages.push({ role: "user", content: prompt });
 
-    const temperature = options?.temperature ?? 0.7;
-    const top_p = options?.top_p ?? 0.7;
-
-    const response = await axios.post(SILICONFLOW_API_URL, {
-      model: "Qwen/Qwen3-8B", // 可选 deepseek-ai/DeepSeek-V3
-      messages: messages,
-      stream: false,
-      max_tokens: 8192,
-      temperature: temperature,
-      top_p: top_p,
-    }, {
-      headers: {
-        "Authorization": `Bearer ${SILICONFLOW_API_KEY}`,
-        "Content-Type": "application/json"
-      }
+    const response = await llmInstance.chat({
+      messages,
+      temperature: options?.temperature
     });
 
-    return response.data.choices[0].message.content;
+    return response.content;
   } catch (error) {
-    console.error("调用 SiliconFlow API 时出错:", error);
+    console.error("调用 LLM 时出错:", error);
     throw new Error(`AI 调用失败: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
@@ -323,7 +324,7 @@ ${textContent}
 - 适当的表情符号
 - 总结性的结尾`;
 
-    const wechatContent = await callSiliconFlowAPI(prompt, systemPrompt);
+    const wechatContent = await callLLM(prompt, systemPrompt);
 
     fs.writeFileSync(wechatPath, wechatContent, 'utf-8');
 
@@ -389,7 +390,7 @@ ${textContent}
 - 尽可能使用 Mermaid 可视化关键流程和结构`;
 
     // 调用模型，低发散
-    const reviewContent = await callSiliconFlowAPI(prompt, systemPrompt, { temperature: 0.3 });
+    const reviewContent = await callLLM(prompt, systemPrompt, { temperature: 0.3 });
 
     fs.writeFileSync(reviewPath, reviewContent, 'utf-8');
 
@@ -470,7 +471,7 @@ async function parsePdfToMarkdown(pdfPath: string, arxivId: string, paperInfo?: 
 
     const prompt = `请将以下论文内容翻译为中文并输出为 Markdown：\n\n${meta}${pdfText}`;
 
-    const markdown = await callSiliconFlowAPI(prompt, systemPrompt);
+    const markdown = await callLLM(prompt, systemPrompt);
 
     fs.writeFileSync(mdPath, markdown, 'utf-8');
 
@@ -1207,10 +1208,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 // 启动服务器
-console.log("启动 ArXiv MCP Server...");
+console.log(`启动 ${SERVER_NAME} v${SERVER_VERSION}...`);
 console.log(`✅ 存储目录: ${storage.STORAGE_ROOT}`);
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-console.log("🚀 ArXiv MCP Server 已启动，等待连接...");
+console.log(`🚀 ${SERVER_NAME} v${SERVER_VERSION} 已启动，等待连接...`);

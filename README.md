@@ -1,15 +1,48 @@
-# ArXiv MCP Server
+# Literature Review MCP Server
 
-一个面向研究生论文级别文献综述的学术论文管理与分析工具。支持 Model Context Protocol (MCP) 标准，提供多源学术数据库搜索、智能质量评估、Notion 知识库集成等功能。
+[![npm version](https://badge.fury.io/js/%40ydzat%2Fliterature-review-mcp.svg)](https://www.npmjs.com/package/@ydzat/literature-review-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+一个面向研究生论文级别文献综述的学术论文管理与分析工具。支持 Model Context Protocol (MCP) 标准，提供多源学术数据库搜索、智能质量评估、智能压缩、多 LLM Provider、Notion 知识库集成等功能。
+
+## 致谢
+
+本项目最初 Fork 自 [arxiv-mcp-server](https://github.com/yzfly/arxiv-mcp-server)，感谢原作者 [@yzfly](https://github.com/yzfly) 的开源贡献。
+
+在原项目基础上，我们进行了大量重构和功能扩展：
+
+- ✨ **多源学术搜索**：新增 DBLP、OpenReview、Papers With Code 等数据源
+- 📊 **智能质量评估**：基于引用数、会议等级、作者声誉的综合评分系统
+- 🗜️ **智能文本压缩**：自动处理超长论文（138K tokens → 38K tokens，压缩率 72.3%）
+- 🤖 **多 LLM Provider 支持**：支持 SiliconFlow、OpenAI、Deepseek 及任何 OpenAI 兼容 API
+- 📥 **批量并发处理**：批量下载、批量分析、统一综述生成
+- 📚 **Notion 完整集成**：自动生成 Notion 友好格式，支持完整/增量导出
+- 💾 **SQLite 数据库**：重构存储架构，支持持久化和高效查询
+- 🔧 **环境变量配置**：支持 `.env` 文件配置，灵活易用
 
 ## 功能亮点
 
-### 🎉 NEW! 完整文献综述生成
+### 🎉 完整文献综述生成
 * 🔍 **多源学术搜索**：跨 DBLP、OpenReview、Papers With Code 等数据源智能搜索
 * 📥 **批量并发下载**：并发下载多篇论文 PDF，支持重试和断点续传
 * 🤖 **批量深度分析**：并发分析多篇论文，生成单篇深度综述（低温度参数，聚焦内容）
 * 📚 **统一文献综述**：基于单篇分析生成跨论文的综合综述（方法对比、趋势分析、知识图谱）
 * 📤 **Notion 完整导出**：完整或增量导出到 Notion（论文库 + 单篇综述 + 综合综述）
+
+### 🗜️ 智能压缩系统
+* 📊 **精确 Token 计算**：使用 tiktoken 库精确计算 token 数
+* 📑 **章节识别**：自动识别论文结构（Abstract, Method, Conclusion 等）
+* 🎯 **分级压缩**：根据章节重要性智能压缩（Abstract/Method: 100% 保留，Reference: 0% 保留）
+* 🔄 **滚动压缩**：逐步合并，避免一次性处理超长文本
+* 🧠 **语义压缩**：调用 LLM 进行智能压缩，而非简单截断
+* ✅ **实测效果**：138K tokens → 38K tokens（压缩率 72.3%），保留核心信息
+
+### 🤖 多 LLM Provider 支持
+* 🌐 **SiliconFlow**：默认 Provider，支持 Qwen 系列模型
+* 🔥 **Deepseek**：高性价比推理模型（128K context, 8K output）
+* 🚀 **OpenAI**：GPT-4o, GPT-4-turbo 等模型
+* 🔧 **自定义 API**：支持任何 OpenAI 兼容 API
+* ⚙️ **灵活配置**：通过环境变量或 `.env` 文件配置
 
 ### 核心功能
 * 📊 **智能质量评估**：基于引用数、会议等级、作者声誉、机构等级的综合评分系统
@@ -31,14 +64,43 @@
 ### NPX 方式（推荐）
 
 ```bash
-npx @langgpt/arxiv-mcp-server
+npx @ydzat/literature-review-mcp
 ```
 
 ### 全局安装
 
 ```bash
-npm install -g @langgpt/arxiv-mcp-server
-arxiv-mcp-server
+npm install -g @ydzat/literature-review-mcp
+literature-review-mcp
+```
+
+### 本地开发
+
+```bash
+# 克隆项目
+git clone https://github.com/ydzat/literature-review-mcp.git
+cd literature-review-mcp
+
+# 安装依赖
+npm install
+
+# 复制环境变量模板
+cp .env.example .env
+
+# 编辑 .env 文件，配置你的 LLM Provider
+# vim .env
+
+# 开发模式运行
+npm run dev
+
+# 构建
+npm run build
+
+# 运行构建版本
+npm start
+
+# 运行测试
+npm run build && node build/tests/test-literature-review.js
 ```
 
 ## 配置要求
@@ -124,13 +186,15 @@ export LLM_MODEL="your_model_name"
 
 在 Claude Desktop 的配置文件中添加：
 
-#### 使用 SiliconFlow（默认）
+#### 方式 1：使用 NPX（推荐，自动更新）
+
+##### 使用 SiliconFlow（默认）
 ```json
 {
   "mcpServers": {
-    "arxiv-mcp-server": {
+    "literature-review-mcp": {
       "command": "npx",
-      "args": ["-y", "@langgpt/arxiv-mcp-server@latest"],
+      "args": ["-y", "@ydzat/literature-review-mcp@latest"],
       "env": {
         "LLM_PROVIDER": "siliconflow",
         "LLM_API_KEY": "your_siliconflow_key"
@@ -140,13 +204,13 @@ export LLM_MODEL="your_model_name"
 }
 ```
 
-#### 使用 Deepseek
+##### 使用 Deepseek
 ```json
 {
   "mcpServers": {
-    "arxiv-mcp-server": {
+    "literature-review-mcp": {
       "command": "npx",
-      "args": ["-y", "@langgpt/arxiv-mcp-server@latest"],
+      "args": ["-y", "@ydzat/literature-review-mcp@latest"],
       "env": {
         "LLM_PROVIDER": "custom",
         "LLM_BASE_URL": "https://api.deepseek.com/v1",
@@ -158,13 +222,13 @@ export LLM_MODEL="your_model_name"
 }
 ```
 
-#### 使用 OpenAI
+##### 使用 OpenAI
 ```json
 {
   "mcpServers": {
-    "arxiv-mcp-server": {
+    "literature-review-mcp": {
       "command": "npx",
-      "args": ["-y", "@langgpt/arxiv-mcp-server@latest"],
+      "args": ["-y", "@ydzat/literature-review-mcp@latest"],
       "env": {
         "LLM_PROVIDER": "openai",
         "LLM_API_KEY": "your_openai_key",
@@ -174,6 +238,25 @@ export LLM_MODEL="your_model_name"
   }
 }
 ```
+
+#### 方式 2：使用本地开发版本
+
+```json
+{
+  "mcpServers": {
+    "literature-review-mcp": {
+      "command": "node",
+      "args": ["/path/to/your/literature-review-mcp/build/index.js"],
+      "env": {
+        "LLM_PROVIDER": "siliconflow",
+        "LLM_API_KEY": "your_api_key_here"
+      }
+    }
+  }
+}
+```
+
+> **注意**：将 `/path/to/your/literature-review-mcp` 替换为你的实际项目路径
 
 **注意**：
 - 工作目录已自动设置为 `~/.arxiv-mcp/`，无需配置 `WORK_DIR`
@@ -481,9 +564,11 @@ DEBUG=arxiv-mcp-server npx @langgpt/arxiv-mcp-server
 
 ## 更新日志
 
-### v1.3.0 (2025-10-18)
+### v1.0.0 (2025-10-18)
 
-- 作者：@ydzat
+**首次独立发布** - Fork 自 [arxiv-mcp-server](https://github.com/yzfly/arxiv-mcp-server)
+
+#### 核心功能
 
 - 🚀 **多 LLM Provider 支持**：支持 SiliconFlow、OpenAI、Deepseek 及任何 OpenAI 兼容 API
 - 🗜️ **智能文本压缩系统**：自动处理超长论文（138K tokens → 38K tokens，压缩率 72.3%）
@@ -495,32 +580,27 @@ DEBUG=arxiv-mcp-server npx @langgpt/arxiv-mcp-server
 - 🤖 **批量深度分析**：并发分析多篇论文，生成单篇深度综述
 - 📚 **统一文献综述**：基于单篇分析生成跨论文综合综述
 - 📤 **Notion 完整导出**：完整或增量导出到 Notion
+
+#### 学术功能
+
+- ✨ **多源学术搜索**：跨 DBLP、OpenReview、Papers With Code 等数据源智能搜索
+- 📊 **智能质量评估**：基于引用数、会议等级、作者声誉、机构等级的综合评分
+- 🎓 **学术严谨性**：低温度 AI 生成，聚焦已下载文章，减少发散
+- 🏆 **顶级论文优先**：自动识别 A*/A 类会议、顶级学者、名校机构的论文
+- 🆕 **最新论文追踪**：特别关注最近 30 天的 AI 领域新论文
+
+#### 技术架构
+
+- � **SQLite 数据库**：重构存储架构，支持持久化和高效查询
 - 🔧 **环境变量配置**：支持 `.env` 文件配置
-- 📖 **完善文档**：更新 README、.env.example、配置示例
+- 📖 **完善文档**：详细的 README、.env.example、配置示例
+- 🧪 **完整测试**：端到端测试覆盖主要功能
 
-### v1.2.0 (2025-10-17)
+#### 继承的功能（来自原项目）
 
-- 作者：@ydzat
-
-- ✨ **新增多源学术搜索工具**：支持跨 DBLP、OpenReview、Papers With Code 等数据源智能搜索论文
-- 📊 **引入智能质量评估系统**：基于引用数、会议等级、作者声誉、机构等级的综合评分
-- 🎓 **增强学术严谨性**：采用低温度 AI 生成，聚焦已下载文章，减少发散
-- 📚 **集成 Notion 知识库**：自动生成 Notion 友好格式，一键导入（需连接 Notion MCP）
-- 🏆 **优先顶级论文**：自动识别 A*/A 类会议、顶级学者、名校机构的论文
-- 🆕 **新增最新论文追踪**：特别关注最近 30 天的 AI 领域新论文
-- 🔧 **优化 MCP 客户端配置**：更新 Claude Desktop 等配置示例
-- 📖 **完善文档**：添加详细工具参数、使用流程和故障排除指南
-
-### v1.0.0 (2024-12-19)
-
-- 作者：@yzfly
-
-- ✨ 初始版本发布
-- 🔍 支持 arXiv 论文搜索
-- 📥 支持 PDF 下载
-- 📝 支持智能中文解读
-- 📱 支持微信文章格式转换
-- 🤖 集成 SiliconFlow AI 服务
+- 🔍 **arXiv 论文搜索**：支持 arXiv 论文搜索和下载
+- 📝 **智能中文解读**：将 PDF 英文内容解析为高质量的中文 Markdown
+- 📱 **微信文章生成**：自动生成适配微信阅读体验的文章草稿
 
 ## 相关链接
 

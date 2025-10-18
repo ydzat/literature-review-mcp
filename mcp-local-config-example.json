@@ -1,16 +1,24 @@
 {
   "mcpServers": {
-    "arxiv-mcp-server-siliconflow": {
-      "command": "node",
-      "args": ["/path/to/your/arxiv-mcp-server/build/index.js"],
+    "literature-review-mcp-npx": {
+      "command": "npx",
+      "args": ["-y", "@ydzat/literature-review-mcp@latest"],
       "env": {
         "LLM_PROVIDER": "siliconflow",
         "LLM_API_KEY": "your_siliconflow_api_key_here"
       }
     },
-    "arxiv-mcp-server-deepseek": {
+    "literature-review-mcp-local-siliconflow": {
       "command": "node",
-      "args": ["/path/to/your/arxiv-mcp-server/build/index.js"],
+      "args": ["/path/to/your/literature-review-mcp/build/index.js"],
+      "env": {
+        "LLM_PROVIDER": "siliconflow",
+        "LLM_API_KEY": "your_siliconflow_api_key_here"
+      }
+    },
+    "literature-review-mcp-local-deepseek": {
+      "command": "node",
+      "args": ["/path/to/your/literature-review-mcp/build/index.js"],
       "env": {
         "LLM_PROVIDER": "custom",
         "LLM_BASE_URL": "https://api.deepseek.com/v1",
@@ -18,9 +26,9 @@
         "LLM_MODEL": "deepseek-chat"
       }
     },
-    "arxiv-mcp-server-openai": {
+    "literature-review-mcp-local-openai": {
       "command": "node",
-      "args": ["/path/to/your/arxiv-mcp-server/build/index.js"],
+      "args": ["/path/to/your/literature-review-mcp/build/index.js"],
       "env": {
         "LLM_PROVIDER": "openai",
         "LLM_API_KEY": "your_openai_api_key_here",
