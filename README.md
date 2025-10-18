@@ -1,6 +1,6 @@
 # Literature Review MCP Server
 
-[![npm version](https://badge.fury.io/js/%40ydzat%2Fliterature-review-mcp.svg)](https://www.npmjs.com/package/@ydzat/literature-review-mcp)
+[![npm](https://img.shields.io/npm/v/@ydzat/literature-review-mcp)](https://www.npmjs.com/package/@ydzat/literature-review-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 一个面向研究生论文级别文献综述的学术论文管理与分析工具。支持 Model Context Protocol (MCP) 标准，提供多源学术数据库搜索、智能质量评估、智能压缩、多 LLM Provider、Notion 知识库集成等功能。
