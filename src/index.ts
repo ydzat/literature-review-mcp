@@ -19,8 +19,8 @@ import { dirname } from 'path';
 import dotenv from 'dotenv';
 import { createLLMProvider, LLMProvider } from './llm/LLMProvider.js';
 
-// 加载环境变量
-dotenv.config();
+// 加载环境变量（不覆盖已存在的环境变量，优先使用 MCP 客户端传入的）
+dotenv.config({ override: false });
 
 const execAsync = promisify(exec);
 

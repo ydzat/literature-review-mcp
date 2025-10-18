@@ -1,6 +1,7 @@
 {
   "mcpServers": {
     "literature-review-mcp-npx": {
+      "comment": "使用 NPX 方式运行（推荐，自动下载最新版本）",
       "command": "npx",
       "args": ["-y", "@ydzat/literature-review-mcp@latest"],
       "env": {
@@ -9,16 +10,18 @@
       }
     },
     "literature-review-mcp-local-siliconflow": {
+      "comment": "本地开发方式（需要先运行 npm run build 编译）",
       "command": "node",
-      "args": ["/path/to/your/literature-review-mcp/build/index.js"],
+      "args": ["/absolute/path/to/literature-review-mcp/build/index.js"],
       "env": {
         "LLM_PROVIDER": "siliconflow",
         "LLM_API_KEY": "your_siliconflow_api_key_here"
       }
     },
     "literature-review-mcp-local-deepseek": {
+      "comment": "本地开发 + Deepseek（需要先运行 npm run build 编译）",
       "command": "node",
-      "args": ["/path/to/your/literature-review-mcp/build/index.js"],
+      "args": ["/absolute/path/to/literature-review-mcp/build/index.js"],
       "env": {
         "LLM_PROVIDER": "custom",
         "LLM_BASE_URL": "https://api.deepseek.com/v1",
@@ -27,8 +30,9 @@
       }
     },
     "literature-review-mcp-local-openai": {
+      "comment": "本地开发 + OpenAI（需要先运行 npm run build 编译）",
       "command": "node",
-      "args": ["/path/to/your/literature-review-mcp/build/index.js"],
+      "args": ["/absolute/path/to/literature-review-mcp/build/index.js"],
       "env": {
         "LLM_PROVIDER": "openai",
         "LLM_API_KEY": "your_openai_api_key_here",
