@@ -1,0 +1,103 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'  # 当推送 v 开头的 tag 时触发，例如 v1.0.0, v1.0.1
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write  # 用于 npm provenance
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build project
+        env:
+          ARXIV_MCP_STORAGE: ${{ runner.temp }}/arxiv-mcp-build
+        run: npm run build
+
+      - name: Verify build output
+        run: |
+          if [ ! -f "build/index.js" ]; then
+            echo "❌ Build failed: build/index.js not found"
+            exit 1
+          fi
+          if [ ! -f "build/database/schema.sql" ]; then
+            echo "❌ Build failed: build/database/schema.sql not found"
+            exit 1
+          fi
+          echo "✅ Build verification passed"
+      
+      - name: Extract version from tag
+        id: get_version
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
+          echo "package_version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
+          echo "Tag version: $TAG_VERSION"
+          echo "Package version: $PACKAGE_VERSION"
+
+      - name: Verify version match
+        run: |
+          if [ "${{ steps.get_version.outputs.tag_version }}" != "${{ steps.get_version.outputs.package_version }}" ]; then
+            echo "❌ Version mismatch!"
+            echo "Tag version: ${{ steps.get_version.outputs.tag_version }}"
+            echo "Package.json version: ${{ steps.get_version.outputs.package_version }}"
+            echo "Please update package.json version to match the tag"
+            exit 1
+          fi
+          echo "✅ Version verification passed"
+      
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ steps.get_version.outputs.tag_version }}
+          body: |
+            ## 🎉 Release ${{ steps.get_version.outputs.tag_version }}
+
+            ### 安装方式
+
+            ```bash
+            # NPX 方式（推荐）
+            npx @ydzat/literature-review-mcp@${{ steps.get_version.outputs.tag_version }}
+
+            # 全局安装
+            npm install -g @ydzat/literature-review-mcp@${{ steps.get_version.outputs.tag_version }}
+            ```
+
+            ### 更新日志
+
+            请查看 [README.md](https://github.com/${{ github.repository }}/blob/main/README.md#更新日志) 了解详细更新内容。
+
+            ### 文档
+
+            - [完整文档](https://github.com/${{ github.repository }}#readme)
+            - [配置指南](https://github.com/${{ github.repository }}#配置要求)
+            - [使用示例](https://github.com/${{ github.repository }}#使用示例)
+          draft: false
+          prerelease: false
+

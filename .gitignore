@@ -103,7 +103,7 @@ dist
 # TernJS port file
 .tern-port
 
-# Build output
+# Build output (由 GitHub Actions 自动构建，不提交到 Git)
 build/
 dist/
 
@@ -129,9 +129,6 @@ DATA_DIR/
 .env*
 !.env.example
 
-# Test files
+# Test data (但保留测试代码)
 test-data/
-src/tests/
-
-# Design docs
 docs/

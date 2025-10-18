@@ -816,6 +816,35 @@ DEBUG=arxiv-mcp-server npx @langgpt/arxiv-mcp-server
 - `04-数据存储策略.md` - 存储架构设计
 - `05-数据库方案分析.md` - 数据库选型分析
 
+## 发布流程
+
+本项目使用 GitHub Actions 自动化发布到 npm。
+
+### 快速发布
+
+```bash
+# 1. 更新版本号并创建 tag
+npm version patch  # Bug 修复 (1.0.0 -> 1.0.1)
+npm version minor  # 新功能 (1.0.0 -> 1.1.0)
+npm version major  # 破坏性更新 (1.0.0 -> 2.0.0)
+
+# 2. 推送到 GitHub
+git push && git push --tags
+```
+
+GitHub Actions 会自动：
+1. ✅ 检出代码
+2. 📦 安装依赖
+3. 🔨 构建项目
+4. ✅ 验证构建产物
+5. ✅ 验证版本号
+6. 📦 发布到 npm
+7. 📋 创建 GitHub Release
+
+### 前置要求
+
+在 GitHub 仓库的 Settings → Secrets 中添加 `NPM_TOKEN`（详见 [RELEASE.md](RELEASE.md)）。
+
 ## 许可证
 
 本项目采用 MIT 许可证。详情请见 [LICENSE](LICENSE) 文件。

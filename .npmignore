@@ -1,0 +1,79 @@
+# Source files (只发布编译后的 build/ 目录)
+src/
+tsconfig.json
+*.ts
+!*.d.ts
+
+# Tests
+**/*.test.js
+**/*.test.ts
+**/*.spec.js
+**/*.spec.ts
+test-*.js
+test-*.ts
+
+# Development files
+.env
+.env.*
+!.env.example
+.env.example
+
+# Documentation (保留 README.md 和 LICENSE)
+docs/
+*.md
+!README.md
+RELEASE.md
+
+# Scripts
+scripts/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# GitHub
+.github/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencies
+node_modules/
+
+# Build artifacts (保留 build/ 目录)
+dist/
+.cache/
+
+# Config files
+mcp-local-config-example.json
+.prettierrc
+.eslintrc
+.editorconfig
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Data directory
+DATA_DIR/
+*.pdf
+*.db
+*.db-journal
+

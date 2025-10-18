@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build project
+        run: npm run build
+      
+      - name: Verify build output
+        run: |
+          if [ ! -f "build/index.js" ]; then
+            echo "❌ Build failed: build/index.js not found"
+            exit 1
+          fi
+          if [ ! -f "build/database/schema.sql" ]; then
+            echo "❌ Build failed: build/database/schema.sql not found"
+            exit 1
+          fi
+          echo "✅ Build verification passed"
+      
+      - name: Check TypeScript types
+        run: npx tsc --noEmit
+
+      - name: Run unit tests
+        env:
+          ARXIV_MCP_STORAGE: ${{ runner.temp }}/arxiv-mcp-test
+        run: |
+          echo "🧪 Running unit tests (no API calls)..."
+          echo "📁 Test storage directory: $ARXIV_MCP_STORAGE"
+          node build/tests/test-consistency.js
+          node build/tests/test-legacy-integration.js
+          node build/tests/test-quick-validation.js
+          echo "✅ All unit tests passed"
+
+      - name: List build artifacts
+        run: |
+          echo "📦 Build artifacts:"
+          ls -lh build/
+          echo ""
+          echo "📊 Build size:"
+          du -sh build/
+

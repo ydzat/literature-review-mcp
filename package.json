@@ -11,7 +11,11 @@
         "build": "tsc && chmod +x build/index.js && cp src/database/schema.sql build/database/",
         "start": "node build/index.js",
         "dev": "tsx src/index.ts",
-        "prepublishOnly": "npm run build"
+        "prepublishOnly": "npm run build",
+        "test": "npm run test:unit",
+        "test:unit": "npm run build && node build/tests/test-consistency.js && node build/tests/test-legacy-integration.js && node build/tests/test-quick-validation.js",
+        "test:integration": "npm run build && node build/tests/test-literature-review.js",
+        "test:all": "npm run test:unit && npm run test:integration"
     },
     "files": [
         "build/**/*",
