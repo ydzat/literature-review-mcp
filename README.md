@@ -64,13 +64,13 @@
 ### NPX 方式（推荐）
 
 ```bash
-npx @ydzat/literature-review-mcp
+npx @ydzat/literature-review-mcp@latest
 ```
 
 ### 全局安装
 
 ```bash
-npm install -g @ydzat/literature-review-mcp
+npm install -g @ydzat/literature-review-mcp@latest
 literature-review-mcp
 ```
 
