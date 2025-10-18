@@ -155,6 +155,13 @@ async function testLiteratureReviewWorkflow() {
           console.log(`   包含论文数: ${review.total_papers}`);
           console.log(`   总字数: ${review.total_words}`);
         }
+
+        // 验证 review_papers 关联是否创建
+        const linkedPapers = storage.db.getPapersByReviewId(reviewResult.reviewId);
+        console.log(`✅ 综述-论文关联已创建: ${linkedPapers.length} 篇论文`);
+        if (linkedPapers.length !== reviewSavedCount) {
+          console.warn(`⚠️  警告: 关联的论文数 (${linkedPapers.length}) 与预期 (${reviewSavedCount}) 不符`);
+        }
       }
 
       // 步骤 6: 导出到 Notion

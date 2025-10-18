@@ -370,6 +370,23 @@ export class DatabaseManager {
     return stmt.all() as Review[];
   }
 
+  linkReviewPaper(reviewId: number, paperId: number): void {
+    const stmt = this.db.prepare(`
+      INSERT OR IGNORE INTO review_papers (review_id, paper_id)
+      VALUES (?, ?)
+    `);
+    stmt.run(reviewId, paperId);
+  }
+
+  getPapersByReviewId(reviewId: number): Paper[] {
+    const stmt = this.db.prepare(`
+      SELECT p.* FROM papers p
+      INNER JOIN review_papers rp ON p.id = rp.paper_id
+      WHERE rp.review_id = ?
+    `);
+    return stmt.all(reviewId) as Paper[];
+  }
+
   // ============================================
   // 缓存操作
   // ============================================

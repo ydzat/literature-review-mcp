@@ -398,7 +398,7 @@ ${textContent}
     const paper = storage.db.getPaperByArxivId(cleanArxivId);
     if (paper) {
       // 保存综述记录
-      storage.db.insertReview({
+      const reviewId = storage.db.insertReview({
         title: `${paper.title} - 学术综述`,
         focus_area: 'single-paper-review',
         content: reviewContent,
@@ -406,6 +406,8 @@ ${textContent}
         total_words: reviewContent.length,
         ai_generated_ratio: 1.0
       });
+      // 建立综述和论文的关联
+      storage.db.linkReviewPaper(reviewId, paper.id!);
       // 更新论文的综述路径
       storage.db.updatePaper(cleanArxivId, { review_path: reviewPath });
       console.log('✅ 综述已保存到数据库');

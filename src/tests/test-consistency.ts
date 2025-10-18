@@ -114,6 +114,8 @@ async function testConsistency() {
       'insertReview',
       'getReviewById',
       'getAllReviews',
+      'linkReviewPaper',
+      'getPapersByReviewId',
       'linkPaperAuthor',
       'linkPaperInstitution',
       'getPaperAuthors',

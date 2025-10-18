@@ -177,6 +177,14 @@ export async function generateUnifiedLiteratureReview(
       ai_generated_ratio: 1.0
     });
 
+    // 4. 建立综述和论文的关联
+    for (const id of paperIds) {
+      const paper = storage.db.getPaperById(id);
+      if (paper && paper.individual_review) {
+        storage.db.linkReviewPaper(reviewId, id);
+      }
+    }
+
     console.log(`\n✅ 统一综述已生成并保存到数据库 (ID: ${reviewId})`);
     console.log(`   包含论文: ${individualReviews.length} 篇`);
     console.log(`   总字数: ${reviewContent.length}`);
