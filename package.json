@@ -1,6 +1,6 @@
 {
     "name": "@ydzat/literature-review-mcp",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "面向研究生论文级别文献综述的学术论文管理与分析工具，支持多源学术搜索、智能质量评估、智能压缩、多 LLM Provider、Notion 知识库集成",
     "main": "build/index.js",
     "bin": {
