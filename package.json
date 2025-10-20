@@ -8,7 +8,7 @@
     },
     "type": "module",
     "scripts": {
-        "build": "tsc && chmod +x build/index.js && cp src/database/schema.sql build/database/",
+        "build": "tsc && mkdir -p build/database && chmod +x build/index.js && cp src/database/schema.sql build/database/"
         "start": "node build/index.js",
         "dev": "tsx src/index.ts",
         "prepublishOnly": "npm run build",
