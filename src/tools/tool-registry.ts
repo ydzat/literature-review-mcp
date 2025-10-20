@@ -16,7 +16,12 @@ import {
   generateUnifiedLiteratureReview 
 } from './batch-tools.js';
 import { searchAcademicPapers } from './search-tools.js';
-import { exportToNotionFullTool, exportToNotionUpdateTool } from './export-tools.js';
+import {
+  exportToNotionFullTool,
+  exportToNotionUpdateTool,
+  exportIndividualReviewToMd,
+  batchExportIndividualReviews
+} from './export-tools.js';
 import { clearWorkdir } from './utility-tools.js';
 
 /**
@@ -361,6 +366,31 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
       args.arxiv_id,
       args.page_id
     )
+  },
+  {
+    name: 'export_individual_review_to_md',
+    description: '将数据库中的单篇文献综述导出为 Markdown 文件',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        arxiv_id: {
+          type: 'string',
+          description: 'arXiv 论文ID'
+        }
+      },
+      required: ['arxiv_id']
+    },
+    handler: async (args) => await exportIndividualReviewToMd(args.arxiv_id)
+  },
+  {
+    name: 'batch_export_individual_reviews',
+    description: '批量导出所有有单篇综述的论文为 Markdown 文件',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+      required: []
+    },
+    handler: async () => await batchExportIndividualReviews()
   },
 
   // 实用工具
