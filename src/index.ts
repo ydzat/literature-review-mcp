@@ -193,25 +193,15 @@ async function downloadArxivPdf(input: string): Promise<string> {
 
 // 工具函数：使用 AI 模型（已废弃，使用 LLMProvider 代替）
 // 保留此函数以兼容旧代码，内部调用 LLMProvider
+/**
+ * 调用 LLM（内部辅助函数，带智能压缩）
+ * 使用 LLMProvider 的 chatWithCompression 方法
+ */
 async function callLLM(prompt: string, systemPrompt?: string, options?: { temperature?: number }): Promise<string> {
-  try {
-    const llmInstance = getLLM();
-    const messages: Array<{role: 'system' | 'user' | 'assistant', content: string}> = [];
-    if (systemPrompt) {
-      messages.push({ role: "system", content: systemPrompt });
-    }
-    messages.push({ role: "user", content: prompt });
-
-    const response = await llmInstance.chat({
-      messages,
-      temperature: options?.temperature
-    });
-
-    return response.content;
-  } catch (error) {
-    console.error("调用 LLM 时出错:", error);
-    throw new Error(`AI 调用失败: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  const llmInstance = getLLM();
+  return await llmInstance.chatWithCompression(prompt, systemPrompt, {
+    temperature: options?.temperature
+  });
 }
 
 async function extractPdfText(pdfPath: string): Promise<string> {

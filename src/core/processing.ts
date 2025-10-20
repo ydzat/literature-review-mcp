@@ -9,7 +9,6 @@ import { storage } from '../storage/StorageManager.js';
 import { createLLMProvider, LLMProvider } from '../llm/LLMProvider.js';
 import { extractPdfText } from './pdf.js';
 import { cleanArxivId } from './arxiv.js';
-import { countTokens, identifySections, rollingCompression } from '../llm/smart-compression.js';
 
 // 延迟初始化 LLM Provider
 let llm: LLMProvider | null = null;
@@ -88,62 +87,17 @@ export interface ProcessingResult {
 
 /**
  * 调用 LLM（内部辅助函数，带智能压缩）
+ * 现在使用 LLMProvider 的 chatWithCompression 方法
  */
 async function callLLM(
   prompt: string,
   systemPrompt?: string,
   options?: { temperature?: number }
 ): Promise<string> {
-  try {
-    const llmInstance = getLLM();
-
-    // 1. 计算 token 数
-    const systemTokens = systemPrompt ? countTokens(systemPrompt) : 0;
-    const promptTokens = countTokens(prompt);
-    const totalInputTokens = systemTokens + promptTokens;
-
-    // 2. 获取模型限制
-    const maxOutputTokens = llmInstance.getMaxOutputTokens();
-    // 假设 maxContextTokens 是总的上下文窗口（输入+输出）
-    const maxContextTokens = 128000; // 默认值，可以从 modelInfo 获取
-    const availableTokens = maxContextTokens - maxOutputTokens - 1000; // 留 1000 tokens 缓冲
-
-    console.log(`📊 Token 统计: 系统提示 ${systemTokens}, 用户提示 ${promptTokens}, 总计 ${totalInputTokens} / ${availableTokens}`);
-
-    // 3. 如果超长，使用智能压缩
-    let processedPrompt = prompt;
-    if (totalInputTokens > availableTokens) {
-      console.log(`⚠️  输入超长 (${totalInputTokens} > ${availableTokens})，启动智能压缩...`);
-
-      // 识别章节
-      const sections = identifySections(prompt);
-      console.log(`📑 识别到 ${sections.length} 个章节`);
-
-      // 滚动压缩
-      processedPrompt = await rollingCompression(sections, llmInstance, availableTokens - systemTokens);
-
-      const compressedTokens = countTokens(processedPrompt);
-      const compressionRatio = ((1 - compressedTokens / promptTokens) * 100).toFixed(1);
-      console.log(`✅ 压缩完成: ${promptTokens} → ${compressedTokens} tokens (压缩率: ${compressionRatio}%)`);
-    }
-
-    // 4. 调用 LLM
-    const messages: Array<{ role: 'system' | 'user' | 'assistant', content: string }> = [];
-    if (systemPrompt) {
-      messages.push({ role: "system", content: systemPrompt });
-    }
-    messages.push({ role: "user", content: processedPrompt });
-
-    const response = await llmInstance.chat({
-      messages,
-      temperature: options?.temperature
-    });
-
-    return response.content;
-  } catch (error) {
-    console.error("调用 LLM 时出错:", error);
-    throw new Error(`AI 调用失败: ${error instanceof Error ? error.message : String(error)}`);
-  }
+  const llmInstance = getLLM();
+  return await llmInstance.chatWithCompression(prompt, systemPrompt, {
+    temperature: options?.temperature
+  });
 }
 
 /**

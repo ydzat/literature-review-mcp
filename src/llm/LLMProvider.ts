@@ -5,6 +5,7 @@
 
 import axios, { AxiosInstance } from 'axios';
 import { LLMConfig, LLMRequest, LLMResponse, ModelInfo, KNOWN_MODELS, PROVIDER_DEFAULTS } from './types.js';
+import { countTokens, identifySections, rollingCompression } from './smart-compression.js';
 
 export class LLMProvider {
   private config: LLMConfig;
@@ -120,7 +121,113 @@ export class LLMProvider {
   }
 
   /**
+   * 简化的聊天方法
+   * 接受 prompt 和可选的 systemPrompt，自动构建 messages
+   *
+   * @param prompt 用户提示
+   * @param systemPrompt 系统提示（可选）
+   * @param options 选项
+   * @returns LLM 响应内容
+   */
+  public async simpleChat(
+    prompt: string,
+    systemPrompt?: string,
+    options?: { temperature?: number; maxTokens?: number }
+  ): Promise<string> {
+    const messages: Array<{ role: 'system' | 'user' | 'assistant', content: string }> = [];
+
+    if (systemPrompt) {
+      messages.push({ role: "system", content: systemPrompt });
+    }
+    messages.push({ role: "user", content: prompt });
+
+    const response = await this.chat({
+      messages,
+      temperature: options?.temperature,
+      maxTokens: options?.maxTokens
+    });
+
+    return response.content;
+  }
+
+  /**
+   * 带智能压缩的聊天方法
+   * 自动检测输入长度，超长时使用智能压缩
+   *
+   * @param prompt 用户提示
+   * @param systemPrompt 系统提示（可选）
+   * @param options 选项
+   * @returns LLM 响应内容
+   */
+  public async chatWithCompression(
+    prompt: string,
+    systemPrompt?: string,
+    options?: {
+      temperature?: number;
+      maxTokens?: number;
+      enableCompression?: boolean;  // 是否启用压缩（默认 true）
+    }
+  ): Promise<string> {
+    try {
+      // 1. 计算 token 数
+      const systemTokens = systemPrompt ? countTokens(systemPrompt) : 0;
+      const promptTokens = countTokens(prompt);
+      const totalInputTokens = systemTokens + promptTokens;
+
+      // 2. 获取模型限制
+      const maxOutputTokens = this.getMaxOutputTokens();
+      const maxContextTokens = this.getMaxContextTokens();
+      const availableTokens = maxContextTokens - maxOutputTokens - 1000; // 留 1000 tokens 缓冲
+
+      console.log(`📊 Token 统计: 系统提示 ${systemTokens}, 用户提示 ${promptTokens}, 总计 ${totalInputTokens} / ${availableTokens}`);
+
+      // 3. 如果超长且启用压缩，使用智能压缩
+      let processedPrompt = prompt;
+      const enableCompression = options?.enableCompression !== false;  // 默认启用
+
+      if (totalInputTokens > availableTokens && enableCompression) {
+        console.log(`⚠️  输入超长 (${totalInputTokens} > ${availableTokens})，启动智能压缩...`);
+
+        // 识别章节
+        const sections = identifySections(prompt);
+        console.log(`📑 识别到 ${sections.length} 个章节`);
+
+        // 滚动压缩
+        processedPrompt = await rollingCompression(sections, this, availableTokens - systemTokens);
+
+        const compressedTokens = countTokens(processedPrompt);
+        const compressionRatio = ((1 - compressedTokens / promptTokens) * 100).toFixed(1);
+        console.log(`✅ 压缩完成: ${promptTokens} → ${compressedTokens} tokens (压缩率: ${compressionRatio}%)`);
+      } else if (totalInputTokens > availableTokens) {
+        console.warn(`⚠️  输入超长但压缩已禁用，可能导致 API 调用失败`);
+      }
+
+      // 4. 调用 LLM
+      return await this.simpleChat(processedPrompt, systemPrompt, {
+        temperature: options?.temperature,
+        maxTokens: options?.maxTokens
+      });
+
+    } catch (error) {
+      console.error("调用 LLM 时出错:", error);
+      throw new Error(`AI 调用失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * 精确计算文本的 token 数量
+   * 使用 tiktoken 库进行精确计算
+   *
+   * @param text 文本内容
+   * @returns token 数量
+   */
+  public countTokens(text: string): number {
+    return countTokens(text, this.config.model);
+  }
+
+  /**
    * 估算文本的 token 数量（粗略估计）
+   * @deprecated 使用 countTokens() 代替
    */
   public estimateTokens(text: string): number {
     // 简单估算：中文 ~1.5 字符/token，英文 ~4 字符/token

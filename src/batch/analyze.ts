@@ -6,7 +6,6 @@ import * as fs from 'fs';
 import { storage } from '../storage/StorageManager.js';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { createLLMProvider, LLMProvider } from '../llm/LLMProvider.js';
-import { countTokens, identifySections, rollingCompression } from '../llm/smart-compression.js';
 
 // 延迟初始化 LLM Provider（在第一次使用时创建）
 let llm: LLMProvider | null = null;
@@ -52,6 +51,7 @@ async function extractPdfText(pdfPath: string): Promise<string> {
 
 /**
  * 调用 AI 生成单篇论文深度分析
+ * 使用 LLMProvider 的 chatWithCompression 方法
  */
 async function generateIndividualReview(
   textContent: string,
@@ -60,32 +60,6 @@ async function generateIndividualReview(
 ): Promise<string> {
   const llmInstance = getLLM();
 
-  // 1. 计算文本 token 数
-  const totalTokens = countTokens(textContent);
-  const maxContextTokens = llmInstance.getMaxContextTokens();
-  const maxOutputTokens = llmInstance.getMaxOutputTokens();
-  const systemPromptTokens = 500; // 估算 system prompt 的 token 数
-  const availableTokens = maxContextTokens - maxOutputTokens - systemPromptTokens - 1000; // 留 1000 安全余量
-
-  console.log(`  📊 文本统计: ${totalTokens} tokens (上下文限制: ${maxContextTokens}, 可用: ${availableTokens})`);
-
-  // 2. 如果文本过长，使用智能压缩
-  let processedText = textContent;
-  if (totalTokens > availableTokens) {
-    console.log(`  🗜️  文本超长，启动智能压缩...`);
-
-    // 识别章节
-    const sections = identifySections(textContent);
-    console.log(`  📑 识别到 ${sections.length} 个章节`);
-
-    // 滚动压缩
-    processedText = await rollingCompression(sections, llmInstance, availableTokens);
-
-    const compressedTokens = countTokens(processedText);
-    console.log(`  ✅ 压缩完成: ${totalTokens} → ${compressedTokens} tokens (压缩率: ${((1 - compressedTokens / totalTokens) * 100).toFixed(1)}%)`);
-  }
-
-  // 3. 生成分析
   const systemPrompt = `你是一位严谨的学术研究助手，专门负责对单篇论文进行深度分析。
 
 **核心要求**：
@@ -107,21 +81,16 @@ async function generateIndividualReview(
   const userPrompt = `请对以下论文进行深度分析（arXiv ID: ${arxivId}）：
 
 ---
-${processedText}
+${textContent}
 ---
 
 请严格按照系统提示中的分析框架输出 Markdown 格式的分析报告。`;
 
   try {
-    const response = await llmInstance.chat({
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
+    // 使用 chatWithCompression 自动处理超长文本
+    return await llmInstance.chatWithCompression(userPrompt, systemPrompt, {
       temperature: temperature
     });
-
-    return response.content;
   } catch (error: any) {
     throw new Error(`AI 调用失败: ${error.message}`);
   }
