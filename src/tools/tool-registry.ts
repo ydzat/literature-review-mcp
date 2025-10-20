@@ -35,7 +35,7 @@ export interface ToolDefinition {
 export const TOOL_REGISTRY: ToolDefinition[] = [
   // arXiv 工具
   {
-    name: 'search_arxiv',
+    name: 'search_arxiv_papers',
     description: '搜索 arXiv 论文',
     inputSchema: {
       type: 'object',
@@ -44,7 +44,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
           type: 'string',
           description: '搜索英文关键词'
         },
-        maxResults: {
+        max_results: {
           type: 'number',
           description: '最大结果数量',
           default: 5
@@ -52,7 +52,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
       },
       required: ['query']
     },
-    handler: async (args) => await searchArxivPapers(args.query, args.maxResults)
+    handler: async (args) => await searchArxivPapers(args.query, args.max_results || 5)
   },
   {
     name: 'download_arxiv_pdf',
@@ -60,14 +60,14 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        input: {
+        arxiv_id: {
           type: 'string',
           description: 'arXiv 论文URL（如：http://arxiv.org/abs/2403.15137v1）或 arXiv ID（如：2403.15137v1），优先使用URL'
         }
       },
-      required: ['input']
+      required: ['arxiv_id']
     },
-    handler: async (args) => await downloadArxivPdfTool(args.input)
+    handler: async (args) => await downloadArxivPdfTool(args.arxiv_id)
   },
 
   // 论文处理工具
@@ -77,7 +77,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        arxivId: {
+        arxiv_id: {
           type: 'string',
           description: 'arXiv 论文ID'
         },
@@ -92,9 +92,9 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
           }
         }
       },
-      required: ['arxivId']
+      required: ['arxiv_id']
     },
-    handler: async (args) => await parsePdfToText(args.arxivId, args.paperInfo)
+    handler: async (args) => await parsePdfToText(args.arxiv_id, args.paperInfo)
   },
   {
     name: 'parse_pdf_to_markdown',
@@ -102,7 +102,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        arxivId: {
+        arxiv_id: {
           type: 'string',
           description: 'arXiv 论文ID'
         },
@@ -117,9 +117,9 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
           }
         }
       },
-      required: ['arxivId']
+      required: ['arxiv_id']
     },
-    handler: async (args) => await parsePdfToMarkdown(args.arxivId, args.paperInfo)
+    handler: async (args) => await parsePdfToMarkdown(args.arxiv_id, args.paperInfo)
   },
   {
     name: 'convert_to_wechat_article',
@@ -127,14 +127,14 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        arxivId: {
+        arxiv_id: {
           type: 'string',
           description: 'arXiv 论文ID'
         }
       },
-      required: ['arxivId']
+      required: ['arxiv_id']
     },
-    handler: async (args) => await convertToWechatArticle(args.arxivId)
+    handler: async (args) => await convertToWechatArticle(args.arxiv_id)
   },
   {
     name: 'convert_to_academic_review_enhanced',
@@ -142,14 +142,14 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        arxivId: {
+        arxiv_id: {
           type: 'string',
           description: 'arXiv 论文ID'
         }
       },
-      required: ['arxivId']
+      required: ['arxiv_id']
     },
-    handler: async (args) => await convertToAcademicReviewEnhanced(args.arxivId)
+    handler: async (args) => await convertToAcademicReviewEnhanced(args.arxiv_id)
   },
   {
     name: 'process_arxiv_paper',
@@ -157,19 +157,19 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        arxivId: {
+        arxiv_id: {
           type: 'string',
           description: 'arXiv 论文ID'
         },
-        includeWechat: {
+        include_wechat: {
           type: 'boolean',
           description: '是否生成微信文章',
           default: true
         }
       },
-      required: ['arxivId']
+      required: ['arxiv_id']
     },
-    handler: async (args) => await processArxivPaper(args.arxivId, args.includeWechat)
+    handler: async (args) => await processArxivPaper(args.arxiv_id, args.include_wechat)
   },
 
   // 批量处理工具
@@ -179,10 +179,10 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        paperIds: {
+        arxiv_ids: {
           type: 'array',
-          items: { type: 'number' },
-          description: '论文数据库 ID 列表'
+          items: { type: 'string' },
+          description: 'arXiv ID 列表'
         },
         maxConcurrent: {
           type: 'number',
@@ -195,9 +195,9 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
           default: 3
         }
       },
-      required: ['paperIds']
+      required: ['arxiv_ids']
     },
-    handler: async (args) => await batchDownloadPdfsTool(args.paperIds, args.maxConcurrent, args.maxRetries)
+    handler: async (args) => await batchDownloadPdfsTool(args.arxiv_ids, args.maxConcurrent, args.maxRetries)
   },
   {
     name: 'batch_analyze_papers',
@@ -205,10 +205,15 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        arxivIds: {
+        arxiv_ids: {
           type: 'array',
           items: { type: 'string' },
           description: 'arXiv ID 列表'
+        },
+        include_wechat: {
+          type: 'boolean',
+          description: '是否生成微信文章',
+          default: true
         },
         maxConcurrent: {
           type: 'number',
@@ -226,10 +231,10 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
           default: true
         }
       },
-      required: ['arxivIds']
+      required: ['arxiv_ids']
     },
     handler: async (args) => await batchAnalyzePapersTool(
-      args.arxivIds,
+      args.arxiv_ids,
       args.maxConcurrent,
       args.temperature,
       args.skipExisting
@@ -241,10 +246,14 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        paperIds: {
+        arxiv_ids: {
           type: 'array',
-          items: { type: 'number' },
-          description: '论文数据库 ID 列表'
+          items: { type: 'string' },
+          description: 'arXiv ID 列表'
+        },
+        topic: {
+          type: 'string',
+          description: '综述主题'
         },
         temperature: {
           type: 'number',
@@ -256,10 +265,10 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
           description: '研究焦点领域'
         }
       },
-      required: ['paperIds']
+      required: ['arxiv_ids']
     },
     handler: async (args) => await generateUnifiedLiteratureReview(
-      args.paperIds,
+      args.arxiv_ids,
       args.temperature,
       args.focusArea
     )
@@ -276,7 +285,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
           type: 'string',
           description: '搜索关键词'
         },
-        maxResults: {
+        max_results: {
           type: 'number',
           description: '最大结果数量',
           default: 10
@@ -290,6 +299,11 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
           description: '数据源列表',
           default: ['dblp', 'openreview', 'paperswithcode']
         },
+        export_to_notion: {
+          type: 'boolean',
+          description: '是否导出到 Notion',
+          default: false
+        },
         minQualityScore: {
           type: 'number',
           description: '最低质量评分（0-100）',
@@ -300,7 +314,7 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     },
     handler: async (args) => await searchAcademicPapers(
       args.query,
-      args.maxResults,
+      args.max_results,
       args.sources,
       args.minQualityScore
     )
@@ -313,19 +327,18 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        paperIds: {
-          type: 'array',
-          items: { type: 'number' },
-          description: '论文数据库 ID 列表'
+        arxiv_id: {
+          type: 'string',
+          description: 'arXiv 论文ID'
         },
-        reviewId: {
-          type: 'number',
-          description: '综述 ID（可选）'
+        database_id: {
+          type: 'string',
+          description: 'Notion 数据库 ID'
         }
       },
-      required: ['paperIds']
+      required: ['arxiv_id', 'database_id']
     },
-    handler: async (args) => await exportToNotionFullTool(args.paperIds, args.reviewId)
+    handler: async (args) => await exportToNotionFullTool(args.arxiv_id, args.database_id)
   },
   {
     name: 'export_to_notion_update',
@@ -333,27 +346,20 @@ export const TOOL_REGISTRY: ToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        paperIds: {
-          type: 'array',
-          items: { type: 'number' },
-          description: '论文数据库 ID 列表'
+        arxiv_id: {
+          type: 'string',
+          description: 'arXiv 论文ID'
         },
-        existingArxivIds: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Notion 中已存在的 arXiv ID 列表'
-        },
-        reviewId: {
-          type: 'number',
-          description: '综述 ID（可选）'
+        page_id: {
+          type: 'string',
+          description: 'Notion 页面 ID'
         }
       },
-      required: ['paperIds', 'existingArxivIds']
+      required: ['arxiv_id', 'page_id']
     },
     handler: async (args) => await exportToNotionUpdateTool(
-      args.paperIds,
-      args.existingArxivIds,
-      args.reviewId
+      args.arxiv_id,
+      args.page_id
     )
   },
 

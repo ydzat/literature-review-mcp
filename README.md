@@ -19,6 +19,7 @@
 - 📚 **Notion 完整集成**：自动生成 Notion 友好格式，支持完整/增量导出
 - 💾 **SQLite 数据库**：重构存储架构，支持持久化和高效查询
 - 🔧 **环境变量配置**：支持 `.env` 文件配置，灵活易用
+- 🏗️ **模块化架构**：完全重构代码结构，采用清晰的分层设计（v2.0.0）
 
 ## 功能亮点
 
@@ -807,6 +808,36 @@ DEBUG=arxiv-mcp-server npx @langgpt/arxiv-mcp-server
 - 单元测试覆盖核心功能
 - 保持代码简洁，避免过度设计
 
+### 项目架构
+
+v2.0.0 采用清晰的模块化架构：
+
+```
+src/
+├── core/              # 核心功能模块
+│   ├── pdf.ts         # PDF 解析（pdfjs-dist）
+│   ├── arxiv.ts       # arXiv 搜索和下载
+│   └── processing.ts  # 论文处理（智能压缩集成）
+├── tools/             # 工具封装层
+│   ├── arxiv-tools.ts      # arXiv 工具
+│   ├── processing-tools.ts # 处理工具
+│   ├── batch-tools.ts      # 批量工具
+│   ├── search-tools.ts     # 搜索工具
+│   ├── export-tools.ts     # 导出工具
+│   ├── utility-tools.ts    # 实用工具
+│   ├── tool-registry.ts    # 工具注册表
+│   └── index.ts            # 统一导出
+├── llm/               # LLM 抽象层
+│   ├── LLMProvider.ts      # 增强的 LLM Provider
+│   └── smart-compression.ts # 智能压缩系统
+├── storage/           # 存储管理
+│   └── StorageManager.ts   # 文件和数据库管理
+├── database/          # 数据库
+│   ├── DatabaseManager.ts  # SQLite 管理器
+│   └── schema.sql          # 数据库模式
+└── index.ts           # MCP 服务器入口（89 行）
+```
+
 ### 开发路线图
 
 查看 `docs/` 目录了解详细的设计文档：
@@ -815,6 +846,9 @@ DEBUG=arxiv-mcp-server npx @langgpt/arxiv-mcp-server
 - `03-Notion集成输出设计.md` - Notion 集成设计
 - `04-数据存储策略.md` - 存储架构设计
 - `05-数据库方案分析.md` - 数据库选型分析
+- `10-统一重构设计方案.md` - v2.0.0 架构设计
+- `11-重构执行计划.md` - v2.0.0 执行计划
+- `12-重构进度报告.md` - v2.0.0 进度报告
 
 ## 发布流程
 
@@ -850,6 +884,29 @@ GitHub Actions 会自动：
 本项目采用 MIT 许可证。详情请见 [LICENSE](LICENSE) 文件。
 
 ## 更新日志
+
+### v2.0.0 (2025-10-20)
+
+**重大重构** - 完全模块化架构
+
+#### 架构重构
+
+- 🏗️ **模块化设计**：将 1200+ 行的 `index.ts` 重构为清晰的分层架构
+  - `core/` - 核心功能模块（PDF、arXiv、处理）
+  - `tools/` - 工具封装层（按功能分类）
+  - `llm/` - LLM 抽象层（增强功能）
+  - `handlers/` - MCP 处理器（工具注册表）
+- 📊 **代码减少 93%**：`index.ts` 从 1210 行减少到 89 行
+- ✅ **向后兼容**：所有工具名称和参数保持不变
+- 🧪 **完整测试**：单元测试 + 集成测试 + 兼容性测试
+- 🗜️ **智能压缩集成**：所有 LLM 调用自动使用智能压缩
+- 🐛 **Bug 修复**：修复作者信息处理、PDF 文本提取等问题
+
+#### 新增功能
+
+- 🔧 **工具注册表**：配置化的工具管理系统
+- 📝 **增强 LLMProvider**：新增 `simpleChat()`、`chatWithCompression()`、`countTokens()` 等便捷方法
+- 📊 **进度报告**：详细的重构进度文档（`docs/12-重构进度报告.md`）
 
 ### v1.0.0 (2025-10-18)
 

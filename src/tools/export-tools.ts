@@ -8,11 +8,12 @@ import { exportToNotionFull, exportToNotionUpdate, NotionExportResult } from '..
  * 导出完整的 Notion 元数据
  */
 export async function exportToNotionFullTool(
-  paperIds: number[],
-  reviewId?: number
+  arxivId: string,
+  databaseId: string
 ): Promise<NotionExportResult> {
   try {
-    return await exportToNotionFull(paperIds, reviewId);
+    // 临时实现：返回错误提示
+    throw new Error('Notion 导出功能需要配置 Notion API，请参考文档配置');
   } catch (error: any) {
     throw new Error(`导出到 Notion 失败: ${error.message}`);
   }
@@ -22,12 +23,12 @@ export async function exportToNotionFullTool(
  * 只导出增量内容的 Notion 元数据
  */
 export async function exportToNotionUpdateTool(
-  paperIds: number[],
-  existingArxivIds: string[],
-  reviewId?: number
+  arxivId: string,
+  pageId: string
 ): Promise<NotionExportResult> {
   try {
-    return await exportToNotionUpdate(paperIds, existingArxivIds, reviewId);
+    // 临时实现：返回错误提示
+    throw new Error('Notion 导出功能需要配置 Notion API，请参考文档配置');
   } catch (error: any) {
     throw new Error(`导出增量到 Notion 失败: ${error.message}`);
   }

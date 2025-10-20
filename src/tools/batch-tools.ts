@@ -10,35 +10,30 @@ import { storage } from '../storage/StorageManager.js';
  * 批量并发下载多篇论文的 PDF 文件
  */
 export async function batchDownloadPdfsTool(
-  paperIds: number[],
+  arxivIds: string[],
   maxConcurrent: number = 5,
   maxRetries: number = 3
 ): Promise<{
   success: number;
   failed: number;
-  results: Array<{ paperId: number; success: boolean; pdfPath?: string; error?: string }>;
+  results: Array<{ arxivId: string; success: boolean; pdfPath?: string; error?: string }>;
 }> {
   try {
-    const results: Array<{ paperId: number; success: boolean; pdfPath?: string; error?: string }> = [];
+    const results: Array<{ arxivId: string; success: boolean; pdfPath?: string; error?: string }> = [];
     let successCount = 0;
     let failedCount = 0;
 
     // 使用简单的并发控制
-    for (let i = 0; i < paperIds.length; i += maxConcurrent) {
-      const batch = paperIds.slice(i, i + maxConcurrent);
-      const promises = batch.map(async (paperId) => {
+    for (let i = 0; i < arxivIds.length; i += maxConcurrent) {
+      const batch = arxivIds.slice(i, i + maxConcurrent);
+      const promises = batch.map(async (arxivId) => {
         try {
-          const paper = storage.db.getPaperById(paperId);
-          if (!paper) {
-            throw new Error(`论文 ID ${paperId} 不存在`);
-          }
-
-          const pdfPath = await downloadArxivPdf(paper.arxiv_id);
+          const pdfPath = await downloadArxivPdf(arxivId);
           successCount++;
-          return { paperId, success: true, pdfPath };
+          return { arxivId, success: true, pdfPath };
         } catch (error: any) {
           failedCount++;
-          return { paperId, success: false, error: error.message };
+          return { arxivId, success: false, error: error.message };
         }
       });
 
@@ -94,7 +89,7 @@ export async function batchAnalyzePapersTool(
  * TODO: 此功能尚未实现，需要在 batch/analyze.ts 中添加
  */
 export async function generateUnifiedLiteratureReview(
-  paperIds: number[],
+  arxivIds: string[],
   temperature: number = 0.4,
   focusArea?: string
 ): Promise<{
